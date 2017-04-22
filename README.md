@@ -2,6 +2,17 @@
 
 Prometheus exporter for PgBouncer.
 
+
+## Building and running
+
+    make
+    ./pgbouncer_exporter <flags>
+
+To see all available configuration flags:
+
+    ./pgbouncer_exporter -h
+
+
 ## Metrics
 
 Metric     | Description
@@ -22,16 +33,3 @@ pools.sv_used | Server connections idle more than server_check_delay, needing se
 pools.sv_tested | Server connections currently running either server_reset_query or server_check_query, shown as connection
 pools.sv_login | Server connections currently in the process of logging in, shown as connection
 pools.maxwait | Age of oldest unserved client connection, shown as second
-
-## Building and running
-
-    make
-    ./pgbouncer_exporter <flags>
-
-To see all available configuration flags:
-
-    ./pgbouncer_exporter -h
-
-## Running tests
-
-    make test
