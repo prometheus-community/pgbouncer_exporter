@@ -1,7 +1,7 @@
 # PgBouncer exporter
 
 Prometheus exporter for PgBouncer.
-
+Exports metrics at `9127/metrics`
 
 ## Building and running
 
