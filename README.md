@@ -24,6 +24,9 @@ stats.total_query_time  | Time spent by pgbouncer actively querying PostgreSQL, 
 stats.avg_req | The average number of requests per second in last stat period, shown as request/second
 stats.avg_recv | The client network traffic received, shown as byte/second
 stats.avg_sent | The client network traffic sent, shown as byte/second
+stats.total_received | Total volume in bytes of network traffic received by pgbouncer, shown as bytes
+stats.total_requests | Total number of SQL requests pooled by pgbouncer, shown as requests
+stats.total_sent" | Total volume in bytes of network traffic sent by pgbouncer, shown as bytes
 stats.avg_query | The average query duration, shown as microsecond
 pools.cl_active | Client connections linked to server connection and able to process queries, shown as connection
 pools.cl_waiting | Client connections waiting on a server connection, shown as connection
