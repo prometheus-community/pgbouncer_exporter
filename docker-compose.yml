@@ -1,0 +1,14 @@
+version: '2'
+
+services:
+  postgres:
+    image: postgres:9.4
+    ports:
+      - "5432"
+
+  pgbouncer:
+    image: starefossen/pgbouncer:latest
+    links:
+      - postgres
+    ports:
+      - "6543"
