@@ -88,8 +88,8 @@ type ColumnMapping struct {
 // Exporter collects PgBouncer stats from the given server and exports
 // them using the prometheus metrics package.
 type Exporter struct {
-	pgBouncerConnectionString string
-	mutex                     sync.RWMutex
+	connectionString string
+	mutex            sync.RWMutex
 
 	duration, up, error prometheus.Gauge
 	totalScrapes        prometheus.Counter

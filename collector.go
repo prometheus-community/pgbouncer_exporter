@@ -4,8 +4,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 )
@@ -36,10 +39,17 @@ var (
 )
 
 // NewExporter returns an initialized Exporter.
-func NewExporter(pgBouncerConnectionString string) *Exporter {
+func NewExporter(connectionString string) *Exporter {
+
+	db, err := getDB(connectionString)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Init our exporter.
 	return &Exporter{
+		metricMap: makeDescMap(metricMaps),
+		db:        db,
 		up: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "up",
@@ -69,25 +79,14 @@ func NewExporter(pgBouncerConnectionString string) *Exporter {
 // Query within a namespace mapping and emit metrics. Returns fatal errors if
 // the scrape fails, and a slice of errors if they were non-fatal.
 func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace string, mapping MetricMapNamespace) ([]error, error) {
-	// Check for a query override for this namespace
-	query, found := queryOverrides[namespace]
-	if !found {
-		// No query override - do a simple * search.
-		query = fmt.Sprintf("SELECT * FROM %s;", namespace)
-	}
-
-	// Was this query disabled (i.e. nothing sensible can be queried on this
-	// version of PostgreSQL?
-	if query == "" {
-		// Return success (no pertinent data)
-		return []error{}, nil
-	}
+	query := fmt.Sprintf("SHOW %s;", namespace)
 
 	// Don't fail on a bad scrape of one metric
 	rows, err := db.Query(query)
 	if err != nil {
 		return []error{}, errors.New(fmt.Sprintln("Error running query on database: ", namespace, err))
 	}
+
 	defer rows.Close()
 
 	var columnNames []string
@@ -131,12 +130,23 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 				if metricMapping.discard {
 					continue
 				}
+
+				value, ok := dbToFloat64(columnData[idx])
+				if !ok {
+					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Unexpected error parsing column: ", namespace, columnName, columnData[idx])))
+					continue
+				}
 				// Generate the metric
 				ch <- prometheus.MustNewConstMetric(metricMapping.desc, metricMapping.vtype, value, labels...)
 			} else {
 				// Unknown metric. Report as untyped if scan to float64 works, else note an error too.
 				desc := prometheus.NewDesc(fmt.Sprintf("%s_%s", namespace, columnName), fmt.Sprintf("Unknown metric from %s", namespace), nil, nil)
 
+				value, ok := dbToFloat64(columnData[idx])
+				if !ok {
+					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Unexpected error parsing column: ", namespace, columnName, columnData[idx])))
+					continue
+				}
 				// Its not an error to fail here, since the values are
 				// unexpected anyway.
 				log.Debugln(columnName, labels)
@@ -147,8 +157,60 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	return nonfatalErrors, nil
 }
 
-// Iterate through all the namespace mappings in the exporter and run their
-// queries.
+// Convert database.sql to string for Prometheus labels. Null types are mapped to empty strings.
+func dbToString(t interface{}) (string, bool) {
+	switch v := t.(type) {
+	case int64:
+		return fmt.Sprintf("%v", v), true
+	case float64:
+		return fmt.Sprintf("%v", v), true
+	case time.Time:
+		return fmt.Sprintf("%v", v.Unix()), true
+	case nil:
+		return "", true
+	case []byte:
+		// Try and convert to string
+		return string(v), true
+	case string:
+		return v, true
+	default:
+		return "", false
+	}
+}
+
+// Convert database.sql types to float64s for Prometheus consumption. Null types are mapped to NaN. string and []byte
+// types are mapped as NaN and !ok
+func dbToFloat64(t interface{}) (float64, bool) {
+	switch v := t.(type) {
+	case int64:
+		return float64(v), true
+	case float64:
+		return v, true
+	case time.Time:
+		return float64(v.Unix()), true
+	case []byte:
+		// Try and convert to string and then parse to a float64
+		strV := string(v)
+		result, err := strconv.ParseFloat(strV, 64)
+		if err != nil {
+			return math.NaN(), false
+		}
+		return result, true
+	case string:
+		result, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			log.Infoln("Could not parse string:", err)
+			return math.NaN(), false
+		}
+		return result, true
+	case nil:
+		return math.NaN(), true
+	default:
+		return math.NaN(), false
+	}
+}
+
+// Iterate through all the namespace mappings in the exporter and run their queries.
 func queryNamespaceMappings(ch chan<- prometheus.Metric, db *sql.DB, metricMap map[string]MetricMapNamespace) map[string]error {
 	// Return a map of namespace -> errors
 	namespaceErrors := make(map[string]error)
@@ -213,16 +275,74 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	defer func(begun time.Time) {
 		e.duration.Set(time.Since(begun).Seconds())
 	}(time.Now())
+	log.Info("Starting scrape")
 
 	e.error.Set(0)
 	e.totalScrapes.Inc()
 
-	// Lock the exporter maps
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
 
 	errMap := queryNamespaceMappings(ch, e.db, e.metricMap)
 	if len(errMap) > 0 {
+		log.Fatal(errMap)
 		e.error.Set(1)
 	}
+}
+
+// Turn the MetricMap column mapping into a prometheus descriptor mapping.
+func makeDescMap(metricMaps map[string]map[string]ColumnMapping) map[string]MetricMapNamespace {
+	var metricMap = make(map[string]MetricMapNamespace)
+
+	for namespace, mappings := range metricMaps {
+		thisMap := make(map[string]MetricMap)
+
+		var constLabels []string
+		for columnName, columnMapping := range mappings {
+			if columnMapping.usage == LABEL {
+				constLabels = append(constLabels, columnName)
+			}
+		}
+		for columnName, columnMapping := range mappings {
+			// Determine how to convert the column based on its usage.
+			switch columnMapping.usage {
+			case COUNTER:
+				thisMap[columnName] = MetricMap{
+					vtype: prometheus.CounterValue,
+					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s", namespace, columnName), columnMapping.description, constLabels, nil),
+					conversion: func(in interface{}) (float64, bool) {
+						return dbToFloat64(in)
+					},
+				}
+			case GAUGE:
+				thisMap[columnName] = MetricMap{
+					vtype: prometheus.GaugeValue,
+					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s", namespace, columnName), columnMapping.description, constLabels, nil),
+					conversion: func(in interface{}) (float64, bool) {
+						return dbToFloat64(in)
+					},
+				}
+			}
+		}
+
+		metricMap[namespace] = MetricMapNamespace{constLabels, thisMap}
+	}
+
+	return metricMap
+}
+
+func getDB(conn string) (*sql.DB, error) {
+	db, err := sql.Open("postgres", conn)
+	if err != nil {
+		return nil, err
+	}
+	err = db.Ping()
+	if err != nil {
+		return nil, err
+	}
+
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
+	return db, nil
 }

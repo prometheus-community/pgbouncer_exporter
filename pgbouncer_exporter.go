@@ -3,11 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/common/log"
 	"github.com/prometheus/common/version"
 )
 
@@ -29,10 +29,10 @@ const (
 
 func main() {
 	var (
-		showVersion               = flag.Bool("version", false, "Print version information.")
-		listenAddress             = flag.String("web.listen-address", ":9124", "Address on which to expose metrics and web interface.")
-		pgBouncerConnectionString = flag.String("pgBouncer.connectionString", "pgbouncer:@localhost:6432/pgbouncer", "Address on which to expose metrics and web interface.")
-		metricsPath               = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
+		showVersion             = flag.Bool("version", false, "Print version information.")
+		listenAddress           = flag.String("web.listen-address", ":9124", "Address on which to expose metrics and web interface.")
+		connectionStringPointer = flag.String("pgBouncer.connectionString", "postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable", "Address on which to expose metrics and web interface.")
+		metricsPath             = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 	)
 
 	flag.Parse()
@@ -42,10 +42,11 @@ func main() {
 		os.Exit(0)
 	}
 
-	exporter := NewExporter(pgBouncerConnectionString)
+	connectionString := *connectionStringPointer
+	exporter := NewExporter(connectionString)
 	prometheus.MustRegister(exporter)
 
-	log.Infoln("Starting pgbouncer_exporter", version.Info())
+	log.Infoln("Starting pgbouncer exporter version: ", version.Info())
 
 	http.Handle(*metricsPath, prometheus.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

@@ -11,4 +11,6 @@ services:
     links:
       - postgres
     ports:
-      - "6543"
+      - "127.0.0.1:6543:6543"
+    volumes:
+      - ./pgbouncer.ini:/pgbouncer.ini
