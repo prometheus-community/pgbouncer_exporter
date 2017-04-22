@@ -43,7 +43,7 @@ func main() {
 	}
 
 	connectionString := *connectionStringPointer
-	exporter := NewExporter(connectionString)
+	exporter := NewExporter(connectionString, namespace)
 	prometheus.MustRegister(exporter)
 
 	log.Infoln("Starting pgbouncer exporter version: ", version.Info())

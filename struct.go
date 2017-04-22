@@ -73,8 +73,9 @@ type MetricMapNamespace struct {
 // Stores the prometheus metric description which a given column will be mapped
 // to by the collector
 type MetricMap struct {
-	discard    bool                              // Should metric be discarded during mapping?
-	vtype      prometheus.ValueType              // Prometheus valuetype
+	discard    bool                 // Should metric be discarded during mapping?
+	vtype      prometheus.ValueType // Prometheus valuetype
+	namespace  string
 	desc       *prometheus.Desc                  // Prometheus descriptor
 	conversion func(interface{}) (float64, bool) // Conversion function to turn PG result into float64
 }
@@ -89,6 +90,7 @@ type ColumnMapping struct {
 // them using the prometheus metrics package.
 type Exporter struct {
 	connectionString string
+	namespace        string
 	mutex            sync.RWMutex
 
 	duration, up, error prometheus.Gauge
