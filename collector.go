@@ -16,27 +16,27 @@ import (
 var (
 	metricMaps = map[string]map[string]ColumnMapping{
 		"stats": {
-			"requests_per_second":       {GAUGE, "The request rate, shown as request/second", nil},
-			"bytes_received_per_second": {GAUGE, "The total network traffic received, shown as byte/second", nil},
-			"bytes_sent_per_second":     {GAUGE, "The total network traffic sent, shown as byte/second", nil},
-			"total_query_time":          {GAUGE, "Time spent by pgbouncer actively querying PostgreSQL, shown as microsecond", nil},
-			"avg_req":                   {GAUGE, "The average number of requests per second in last stat period, shown as request/second", nil},
-			"avg_recv":                  {GAUGE, "The client network traffic received, shown as byte/second", nil},
-			"avg_sent":                  {GAUGE, "The client network traffic sent, shown as byte/second", nil},
-			"avg_query":                 {GAUGE, "The average query duration, shown as microsecond", nil},
-			"total_received":            {GAUGE, "Total volume in bytes of network traffic received by pgbouncer, shown as bytes", nil},
-			"total_requests":            {GAUGE, "Total number of SQL requests pooled by pgbouncer, shown as requests", nil},
-			"total_sent":                {GAUGE, "Total volume in bytes of network traffic sent by pgbouncer, shown as bytes", nil},
+			"requests_per_second":       {GAUGE, "The request rate, shown as request/second"},
+			"bytes_received_per_second": {GAUGE, "The total network traffic received, shown as byte/second"},
+			"bytes_sent_per_second":     {GAUGE, "The total network traffic sent, shown as byte/second"},
+			"total_query_time":          {GAUGE, "Time spent by pgbouncer actively querying PostgreSQL, shown as microsecond"},
+			"avg_req":                   {GAUGE, "The average number of requests per second in last stat period, shown as request/second"},
+			"avg_recv":                  {GAUGE, "The client network traffic received, shown as byte/second"},
+			"avg_sent":                  {GAUGE, "The client network traffic sent, shown as byte/second"},
+			"avg_query":                 {GAUGE, "The average query duration, shown as microsecond"},
+			"total_received":            {GAUGE, "Total volume in bytes of network traffic received by pgbouncer, shown as bytes"},
+			"total_requests":            {GAUGE, "Total number of SQL requests pooled by pgbouncer, shown as requests"},
+			"total_sent":                {GAUGE, "Total volume in bytes of network traffic sent by pgbouncer, shown as bytes"},
 		},
 		"pools": {
-			"cl_active":  {GAUGE, "Client connections linked to server connection and able to process queries, shown as connection", nil},
-			"cl_waiting": {GAUGE, "Client connections waiting on a server connection, shown as connection", nil},
-			"sv_active":  {GAUGE, "Server connections linked to a client connection, shown as connection", nil},
-			"sv_idle":    {GAUGE, "Server connections idle and ready for a client query, shown as connection", nil},
-			"sv_used":    {GAUGE, "Server connections idle more than server_check_delay, needing server_check_query, shown as connection", nil},
-			"sv_tested":  {GAUGE, "Server connections currently running either server_reset_query or server_check_query, shown as connection", nil},
-			"sv_login":   {GAUGE, "Server connections currently in the process of logging in, shown as connection", nil},
-			"maxwait":    {GAUGE, "Age of oldest unserved client connection, shown as second", nil},
+			"cl_active":  {GAUGE, "Client connections linked to server connection and able to process queries, shown as connection"},
+			"cl_waiting": {GAUGE, "Client connections waiting on a server connection, shown as connection"},
+			"sv_active":  {GAUGE, "Server connections linked to a client connection, shown as connection"},
+			"sv_idle":    {GAUGE, "Server connections idle and ready for a client query, shown as connection"},
+			"sv_used":    {GAUGE, "Server connections idle more than server_check_delay, needing server_check_query, shown as connection"},
+			"sv_tested":  {GAUGE, "Server connections currently running either server_reset_query or server_check_query, shown as connection"},
+			"sv_login":   {GAUGE, "Server connections currently in the process of logging in, shown as connection"},
+			"maxwait":    {GAUGE, "Age of oldest unserved client connection, shown as second"},
 		},
 	}
 )
@@ -113,14 +113,22 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	nonfatalErrors := []error{}
 
 	for rows.Next() {
+		var database string
 		err = rows.Scan(scanArgs...)
 		if err != nil {
 			return []error{}, errors.New(fmt.Sprintln("Error retrieving rows:", namespace, err))
 		}
+
 		// Loop over column names, and match to scan data. Unknown columns
 		// will be filled with an untyped metric number *if* they can be
 		// converted to float64s. NULLs are allowed and treated as NaN.
 		for idx, columnName := range columnNames {
+
+			if columnName == "database" {
+				log.Debug("Fetching data for row belonging to database ", columnData[idx])
+				database = columnData[idx].(string)
+			}
+
 			if metricMapping, ok := mapping.columnMappings[columnName]; ok {
 				// Is this a metricy metric?
 				if metricMapping.discard {
@@ -132,9 +140,8 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Unexpected error parsing column: ", namespace, columnName, columnData[idx])))
 					continue
 				}
-				log.Debug(metricMapping.desc, metricMapping.vtype, value)
 				// Generate the metric
-				ch <- prometheus.MustNewConstMetric(metricMapping.desc, metricMapping.vtype, value)
+				ch <- prometheus.MustNewConstMetric(metricMapping.desc, metricMapping.vtype, value, database)
 			}
 		}
 	}
@@ -265,8 +272,8 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.scrape(ch)
-
 	ch <- e.duration
+	ch <- e.up
 	ch <- e.totalScrapes
 	ch <- e.error
 }
@@ -297,19 +304,13 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 	for metricNamespace, mappings := range metricMaps {
 		thisMap := make(map[string]MetricMap)
 
-		var constLabels []string
-		for columnName, columnMapping := range mappings {
-			if columnMapping.usage == LABEL {
-				constLabels = append(constLabels, columnName)
-			}
-		}
 		for columnName, columnMapping := range mappings {
 			// Determine how to convert the column based on its usage.
 			switch columnMapping.usage {
 			case COUNTER:
 				thisMap[columnName] = MetricMap{
 					vtype: prometheus.CounterValue,
-					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnName), columnMapping.description, constLabels, nil),
+					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnName), columnMapping.description, []string{"database"}, nil),
 					conversion: func(in interface{}) (float64, bool) {
 						return dbToFloat64(in)
 					},
@@ -317,7 +318,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 			case GAUGE:
 				thisMap[columnName] = MetricMap{
 					vtype: prometheus.GaugeValue,
-					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnName), columnMapping.description, constLabels, nil),
+					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnName), columnMapping.description, []string{"database"}, nil),
 					conversion: func(in interface{}) (float64, bool) {
 						return dbToFloat64(in)
 					},
@@ -325,7 +326,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 			}
 		}
 
-		metricMap[metricNamespace] = MetricMapNamespace{constLabels, thisMap}
+		metricMap[metricNamespace] = MetricMapNamespace{thisMap}
 	}
 
 	return metricMap

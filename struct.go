@@ -66,7 +66,6 @@ const (
 
 // Groups metric maps under a shared set of labels
 type MetricMapNamespace struct {
-	labels         []string             // Label names for this namespace
 	columnMappings map[string]MetricMap // Column mappings in this namespace
 }
 
@@ -81,9 +80,8 @@ type MetricMap struct {
 }
 
 type ColumnMapping struct {
-	usage       columnUsage        `yaml:"usage"`
-	description string             `yaml:"description"`
-	mapping     map[string]float64 `yaml:"metric_mapping"` // Optional column mapping for MAPPEDMETRIC
+	usage       columnUsage `yaml:"usage"`
+	description string      `yaml:"description"`
 }
 
 // Exporter collects PgBouncer stats from the given server and exports
