@@ -31,7 +31,7 @@ func main() {
 	var (
 		showVersion             = flag.Bool("version", false, "Print version information.")
 		listenAddress           = flag.String("web.listen-address", ":9127", "Address on which to expose metrics and web interface.")
-		connectionStringPointer = flag.String("pgBouncer.connectionString", "postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable", "Address on which to expose metrics and web interface.")
+		connectionStringPointer = flag.String("pgBouncer.connectionString", "postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable", "Connection string for accessing pgBouncer.")
 		metricsPath             = flag.String("web.telemetry-path", "/metrics", "Path under which to expose metrics.")
 	)
 
