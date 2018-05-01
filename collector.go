@@ -7,6 +7,7 @@ import (
 	"math"
 	"strconv"
 	"time"
+	"unicode/utf8"
 
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
@@ -111,6 +112,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 
 	for rows.Next() {
 		var database string
+		var user string
 		err = rows.Scan(scanArgs...)
 		if err != nil {
 			return []error{}, errors.New(fmt.Sprintln("Error retrieving rows:", namespace, err))
@@ -120,15 +122,22 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 		// will be filled with an untyped metric number *if* they can be
 		// converted to float64s. NULLs are allowed and treated as NaN.
 		for idx, columnName := range columnNames {
-
 			if columnName == "database" {
 				log.Debug("Fetching data for row belonging to database ", columnData[idx])
 				database = columnData[idx].(string)
+			} else if columnName == "user" {
+				log.Debug("Fetching data for row belonging to user ", columnData[idx])
+				user = columnData[idx].(string)
 			}
 
 			if metricMapping, ok := mapping.columnMappings[columnName]; ok {
 				// Is this a metricy metric?
 				if metricMapping.discard {
+					continue
+				}
+
+				// Prometheus will fail hard if the database and usernames are not UTF-8
+				if !utf8.ValidString(database) || !utf8.ValidString(user) {
 					continue
 				}
 
@@ -138,7 +147,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 					continue
 				}
 				// Generate the metric
-				ch <- prometheus.MustNewConstMetric(metricMapping.desc, metricMapping.vtype, value, database)
+				ch <- prometheus.MustNewConstMetric(metricMapping.desc, metricMapping.vtype, value, database, user)
 			}
 		}
 	}
@@ -307,7 +316,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 			case COUNTER:
 				thisMap[columnName] = MetricMap{
 					vtype: prometheus.CounterValue,
-					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, []string{"database"}, nil),
+					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, []string{"database", "user"}, nil),
 					conversion: func(in interface{}) (float64, bool) {
 						return dbToFloat64(in, columnMapping.factor)
 					},
@@ -315,7 +324,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 			case GAUGE:
 				thisMap[columnName] = MetricMap{
 					vtype: prometheus.GaugeValue,
-					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, []string{"database"}, nil),
+					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, []string{"database", "user"}, nil),
 					conversion: func(in interface{}) (float64, bool) {
 						return dbToFloat64(in, columnMapping.factor)
 					},
