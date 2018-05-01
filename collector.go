@@ -16,14 +16,14 @@ import (
 var (
 	metricMaps = map[string]map[string]ColumnMapping{
 		"stats": {
-			"total_query_count":         {COUNTER, "queries_pooled_total", 1, "Total number of SQL queries pooled"},
-			"total_query_time":          {COUNTER, "queries_duration_seconds", 1e-6, "Total number of seconds spent by pgbouncer when actively connected to PostgreSQL, executing queries"},
-			"total_received":            {COUNTER, "received_bytes_total", 1, "Total volume in bytes of network traffic received by pgbouncer, shown as bytes"},
-			"total_requests":            {COUNTER, "queries_total", 1, "Total number of SQL requests pooled by pgbouncer, shown as requests"},
-			"total_sent":                {COUNTER, "sent_bytes_total", 1, "Total volume in bytes of network traffic sent by pgbouncer, shown as bytes"},
-			"total_wait_time":           {COUNTER, "client_wait_seconds", 1e-6, "Time spent by clients waiting for a server in seconds"},
-			"total_xact_count":          {COUNTER, "sql_transactions_pooled_total", 1, "Total number of SQL transactions pooled"},
-			"total_xact_time":           {COUNTER, "server_in_transaction_seconds", 1e-6, "Total number of seconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries"},
+			"total_query_count": {COUNTER, "queries_pooled_total", 1, "Total number of SQL queries pooled"},
+			"total_query_time":  {COUNTER, "queries_duration_seconds", 1e-6, "Total number of seconds spent by pgbouncer when actively connected to PostgreSQL, executing queries"},
+			"total_received":    {COUNTER, "received_bytes_total", 1, "Total volume in bytes of network traffic received by pgbouncer, shown as bytes"},
+			"total_requests":    {COUNTER, "queries_total", 1, "Total number of SQL requests pooled by pgbouncer, shown as requests"},
+			"total_sent":        {COUNTER, "sent_bytes_total", 1, "Total volume in bytes of network traffic sent by pgbouncer, shown as bytes"},
+			"total_wait_time":   {COUNTER, "client_wait_seconds", 1e-6, "Time spent by clients waiting for a server in seconds"},
+			"total_xact_count":  {COUNTER, "sql_transactions_pooled_total", 1, "Total number of SQL transactions pooled"},
+			"total_xact_time":   {COUNTER, "server_in_transaction_seconds", 1e-6, "Total number of seconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries"},
 		},
 		"pools": {
 			"cl_active":  {GAUGE, "client_active_connections", 1, "Client connections linked to server connection and able to process queries, shown as connection"},
