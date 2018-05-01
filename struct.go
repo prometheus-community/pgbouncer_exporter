@@ -81,6 +81,8 @@ type MetricMap struct {
 
 type ColumnMapping struct {
 	usage       columnUsage `yaml:"usage"`
+	metric      string      `yaml:"metric"`
+	factor      float64     `yaml:"factor"`
 	description string      `yaml:"description"`
 }
 

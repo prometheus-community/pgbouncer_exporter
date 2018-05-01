@@ -16,35 +16,24 @@ import (
 var (
 	metricMaps = map[string]map[string]ColumnMapping{
 		"stats": {
-			"avg_query_count":           {GAUGE, "Average queries per second in last stat period"},
-			"avg_query":                 {GAUGE, "The average query duration, shown as microsecond"},
-			"avg_query_time":            {GAUGE, "Average query duration in microseconds"},
-			"avg_recv":                  {GAUGE, "Average received (from clients) bytes per second"},
-			"avg_req":                   {GAUGE, "The average number of requests per second in last stat period, shown as request/second"},
-			"avg_sent":                  {GAUGE, "Average sent (to clients) bytes per second"},
-			"avg_wait_time":             {GAUGE, "Time spent by clients waiting for a server in microseconds (average per second)"},
-			"avg_xact_count":            {GAUGE, "Average transactions per second in last stat period"},
-			"avg_xact_time":             {GAUGE, "Average transaction duration in microseconds"},
-			"bytes_received_per_second": {GAUGE, "The total network traffic received, shown as byte/second"},
-			"bytes_sent_per_second":     {GAUGE, "The total network traffic sent, shown as byte/second"},
-			"total_query_count":         {GAUGE, "Total number of SQL queries pooled"},
-			"total_query_time":          {GAUGE, "Total number of microseconds spent by pgbouncer when actively connected to PostgreSQL, executing queries"},
-			"total_received":            {GAUGE, "Total volume in bytes of network traffic received by pgbouncer, shown as bytes"},
-			"total_requests":            {GAUGE, "Total number of SQL requests pooled by pgbouncer, shown as requests"},
-			"total_sent":                {GAUGE, "Total volume in bytes of network traffic sent by pgbouncer, shown as bytes"},
-			"total_wait_time":           {GAUGE, "Time spent by clients waiting for a server in microseconds"},
-			"total_xact_count":          {GAUGE, "Total number of SQL transactions pooled"},
-			"total_xact_time":           {GAUGE, "Total number of microseconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries"},
+			"total_query_count":         {COUNTER, "queries_pooled_total", 1, "Total number of SQL queries pooled"},
+			"total_query_time":          {COUNTER, "queries_duration_seconds", 1e-6, "Total number of seconds spent by pgbouncer when actively connected to PostgreSQL, executing queries"},
+			"total_received":            {COUNTER, "received_bytes_total", 1, "Total volume in bytes of network traffic received by pgbouncer, shown as bytes"},
+			"total_requests":            {COUNTER, "queries_total", 1, "Total number of SQL requests pooled by pgbouncer, shown as requests"},
+			"total_sent":                {COUNTER, "sent_bytes_total", 1, "Total volume in bytes of network traffic sent by pgbouncer, shown as bytes"},
+			"total_wait_time":           {COUNTER, "client_wait_seconds", 1e-6, "Time spent by clients waiting for a server in seconds"},
+			"total_xact_count":          {COUNTER, "sql_transactions_pooled_total", 1, "Total number of SQL transactions pooled"},
+			"total_xact_time":           {COUNTER, "server_in_transaction_seconds", 1e-6, "Total number of seconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries"},
 		},
 		"pools": {
-			"cl_active":  {GAUGE, "Client connections linked to server connection and able to process queries, shown as connection"},
-			"cl_waiting": {GAUGE, "Client connections waiting on a server connection, shown as connection"},
-			"sv_active":  {GAUGE, "Server connections linked to a client connection, shown as connection"},
-			"sv_idle":    {GAUGE, "Server connections idle and ready for a client query, shown as connection"},
-			"sv_used":    {GAUGE, "Server connections idle more than server_check_delay, needing server_check_query, shown as connection"},
-			"sv_tested":  {GAUGE, "Server connections currently running either server_reset_query or server_check_query, shown as connection"},
-			"sv_login":   {GAUGE, "Server connections currently in the process of logging in, shown as connection"},
-			"maxwait":    {GAUGE, "Age of oldest unserved client connection, shown as second"},
+			"cl_active":  {GAUGE, "client_active_connections", 1, "Client connections linked to server connection and able to process queries, shown as connection"},
+			"cl_waiting": {GAUGE, "client_waiting_connections", 1, "Client connections waiting on a server connection, shown as connection"},
+			"sv_active":  {GAUGE, "server_active_connections", 1, "Server connections linked to a client connection, shown as connection"},
+			"sv_idle":    {GAUGE, "server_idle_connections", 1, "Server connections idle and ready for a client query, shown as connection"},
+			"sv_used":    {GAUGE, "server_used_connections", 1, "Server connections idle more than server_check_delay, needing server_check_query, shown as connection"},
+			"sv_tested":  {GAUGE, "server_testing_connections", 1, "Server connections currently running either server_reset_query or server_check_query, shown as connection"},
+			"sv_login":   {GAUGE, "server_login_connections", 1, "Server connections currently in the process of logging in, shown as connection"},
+			"maxwait":    {GAUGE, "client_maxwait_seconds", 1, "Age of oldest unserved client connection, shown as second"},
 		},
 	}
 )
@@ -143,7 +132,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 					continue
 				}
 
-				value, ok := dbToFloat64(columnData[idx])
+				value, ok := metricMapping.conversion(columnData[idx])
 				if !ok {
 					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Unexpected error parsing column: ", namespace, columnName, columnData[idx])))
 					continue
@@ -195,12 +184,12 @@ func dbToString(t interface{}) (string, bool) {
 
 // Convert database.sql types to float64s for Prometheus consumption. Null types are mapped to NaN. string and []byte
 // types are mapped as NaN and !ok
-func dbToFloat64(t interface{}) (float64, bool) {
+func dbToFloat64(t interface{}, factor float64) (float64, bool) {
 	switch v := t.(type) {
 	case int64:
-		return float64(v), true
+		return float64(v) * factor, true
 	case float64:
-		return v, true
+		return v * factor, true
 	case time.Time:
 		return float64(v.Unix()), true
 	case []byte:
@@ -217,7 +206,7 @@ func dbToFloat64(t interface{}) (float64, bool) {
 			log.Infoln("Could not parse string:", err)
 			return math.NaN(), false
 		}
-		return result, true
+		return result * factor, true
 	case nil:
 		return math.NaN(), true
 	default:
@@ -318,17 +307,17 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 			case COUNTER:
 				thisMap[columnName] = MetricMap{
 					vtype: prometheus.CounterValue,
-					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnName), columnMapping.description, []string{"database"}, nil),
+					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, []string{"database"}, nil),
 					conversion: func(in interface{}) (float64, bool) {
-						return dbToFloat64(in)
+						return dbToFloat64(in, columnMapping.factor)
 					},
 				}
 			case GAUGE:
 				thisMap[columnName] = MetricMap{
 					vtype: prometheus.GaugeValue,
-					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnName), columnMapping.description, []string{"database"}, nil),
+					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, []string{"database"}, nil),
 					conversion: func(in interface{}) (float64, bool) {
-						return dbToFloat64(in)
+						return dbToFloat64(in, columnMapping.factor)
 					},
 				}
 			}

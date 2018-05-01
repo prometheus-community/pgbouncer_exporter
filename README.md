@@ -15,32 +15,21 @@ To see all available configuration flags:
 
 ## Metrics
 
-Metric     | Description
----------|-------------
-stats.avg_query_count | Average queries per second in last stat period
-stats.avg_query | The average query duration, shown as microsecond
-stats.avg_query_time | Average query duration in microseconds
-stats.avg_recv | Average received (from clients) bytes per second
-stats.avg_req | The average number of requests per second in last stat period, shown as request/second
-stats.avg_sent | Average sent (to clients) bytes per second
-stats.avg_wait_time | Time spent by clients waiting for a server in microseconds (average per second)
-stats.avg_xact_count | Average transactions per second in last stat period
-stats.avg_xact_time | Average transaction duration in microseconds
-stats.bytes_received_per_second | The total network traffic received, shown as byte/second
-stats.bytes_sent_per_second | The total network traffic sent, shown as byte/second
-stats.total_query_count | Total number of SQL queries pooled
-stats.total_query_time | Total number of microseconds spent by pgbouncer when actively connected to PostgreSQL, executing queries
-stats.total_received | Total volume in bytes of network traffic received by pgbouncer, shown as bytes
-stats.total_requests | Total number of SQL requests pooled by pgbouncer, shown as requests
-stats.total_sent | Total volume in bytes of network traffic sent by pgbouncer, shown as bytes
-stats.total_wait_time | Time spent by clients waiting for a server in microseconds
-stats.total_xact_count | Total number of SQL transactions pooled
-stats.total_xact_time | Total number of microseconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries
-pools.cl_active | Client connections linked to server connection and able to process queries, shown as connection
-pools.cl_waiting | Client connections waiting on a server connection, shown as connection
-pools.sv_active | Server connections linked to a client connection, shown as connection
-pools.sv_idle | Server connections idle and ready for a client query, shown as connection
-pools.sv_used | Server connections idle more than server_check_delay, needing server_check_query, shown as connection
-pools.sv_tested | Server connections currently running either server_reset_query or server_check_query, shown as connection
-pools.sv_login | Server connections currently in the process of logging in, shown as connection
-pools.maxwait | Age of oldest unserved client connection, shown as second
+|PgBouncer column|Prometheus Metric|Description|
+|----------------|-----------------|-----------|
+stats_total_query_count | pgbouncer_stats_queries_pooled_total | Total number of SQL queries pooled
+stats.total_query_time | pgbouncer_stats_queries_duration_seconds | Total number of microseconds spent by pgbouncer when actively connected to PostgreSQL, executing queries
+stats.total_received | pgbouncer_stats_received_bytes_total | Total volume in bytes of network traffic received by pgbouncer, shown as bytes
+stats.total_requests | pgbouncer_stats_queries_total | Total number of SQL requests pooled by pgbouncer, shown as requests
+stats.total_sent | pgbouncer_stats_sent_bytes_total | Total volume in bytes of network traffic sent by pgbouncer, shown as bytes
+stats.total_wait_time | pgbouncer_stats_client_wait_seconds | Time spent by clients waiting for a server in microseconds
+stats.total_xact_count | pgbouncer_stats_sql_transactions_pooled_total | Total number of SQL transactions pooled
+stats.total_xact_time | pgbouncer_stats_server_in_transaction_seconds | Total number of microseconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries
+pools.cl_active | pgbouncer_pools_client_active_connections | Client connections linked to server connection and able to process queries, shown as connection
+pools.cl_waiting | pgbouncer_pools_client_waiting_connections | Client connections waiting on a server connection, shown as connection
+pools.sv_active | pgbouncer_pools_server_active_connections | Server connections linked to a client connection, shown as connection
+pools.sv_idle | pgbouncer_pools_server_idle_connections | Server connections idle and ready for a client query, shown as connection
+pools.sv_used | pgbouncer_pools_server_used_connections | Server connections idle more than server_check_delay, needing server_check_query, shown as connection
+pools.sv_tested | pgbouncer_pools_server_testing_connections | Server connections currently running either server_reset_query or server_check_query, shown as connection
+pools.sv_login | pgbouncer_pools_server_login_connections | Server connections currently in the process of logging in, shown as connection
+pools.maxwait | pgbouncer_pools_client_maxwait_seconds | Age of oldest unserved client connection, shown as second
