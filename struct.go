@@ -67,6 +67,7 @@ const (
 // Groups metric maps under a shared set of labels
 type MetricMapNamespace struct {
 	columnMappings map[string]MetricMap // Column mappings in this namespace
+	labels         []string
 }
 
 // Stores the prometheus metric description which a given column will be mapped
