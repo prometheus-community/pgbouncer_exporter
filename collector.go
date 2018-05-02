@@ -123,11 +123,11 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 		for i, label := range mapping.labels {
 			for idx, columnName := range columnNames {
 				if columnName == label {
-					log.Debugf("Fetching data for row belonging to %s: %s", columnName, columnData[idx])
 					labelValues[i] = columnData[idx].(string)
 
 					// Prometheus will fail hard if the database and usernames are not UTF-8
 					if !utf8.ValidString(labelValues[i]) {
+						nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Column %s in %s has an invalid UTF-8 for a label: %s ", columnName, namespace, columnData[idx])))
 						continue
 					}
 				}
