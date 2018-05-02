@@ -114,17 +114,22 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	nonfatalErrors := []error{}
 
 	for rows.Next() {
-		labelValues := make([]string, len(mappings.labels))
+		labelValues := make([]string, len(mapping.labels))
 		err = rows.Scan(scanArgs...)
 		if err != nil {
 			return []error{}, errors.New(fmt.Sprintln("Error retrieving rows:", namespace, err))
 		}
 
-		for i, label := range mappings.labels {
+		for i, label := range mapping.labels {
 			for idx, columnName := range columnNames {
 				if columnName == label {
 					log.Debugf("Fetching data for row belonging to %s: %s", columnName, columnData[idx])
 					labelValues[i] = columnData[idx].(string)
+
+					// Prometheus will fail hard if the database and usernames are not UTF-8
+					if !utf8.ValidString(labelValues[i]) {
+						continue
+					}
 				}
 			}
 		}
@@ -139,18 +144,13 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 					continue
 				}
 
-				// Prometheus will fail hard if the database and usernames are not UTF-8
-				if !utf8.ValidString(database) || !utf8.ValidString(user) {
-					continue
-				}
-
 				value, ok := metricMapping.conversion(columnData[idx])
 				if !ok {
 					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Unexpected error parsing column: ", namespace, columnName, columnData[idx])))
 					continue
 				}
 				// Generate the metric
-				ch <- prometheus.MustNewConstMetric(metricMapping.desc, metricMapping.vtype, value, labelValues)
+				ch <- prometheus.MustNewConstMetric(metricMapping.desc, metricMapping.vtype, value, labelValues...)
 			}
 		}
 	}
@@ -309,7 +309,7 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 // Turn the MetricMap column mapping into a prometheus descriptor mapping.
 func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace string) map[string]MetricMapNamespace {
 	var metricMap = make(map[string]MetricMapNamespace)
-	metricMap.labels = make([]string)
+	var labels = make([]string, 1)
 
 	for metricNamespace, mappings := range metricMaps {
 		thisMap := make(map[string]MetricMap)
@@ -317,7 +317,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 		// First collect all the labels since the metrics will need them
 		for columnName, columnMapping := range mappings {
 			if columnMapping.usage == LABEL {
-				metricMap.labels = append(metricMap.labels, columnName)
+				labels = append(labels, columnName)
 			}
 		}
 
