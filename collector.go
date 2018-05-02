@@ -17,6 +17,7 @@ import (
 var (
 	metricMaps = map[string]map[string]ColumnMapping{
 		"stats": {
+			"database":          {LABEL, "N/A", 1, "N/A"},
 			"total_query_count": {COUNTER, "queries_pooled_total", 1, "Total number of SQL queries pooled"},
 			"total_query_time":  {COUNTER, "queries_duration_seconds", 1e-6, "Total number of seconds spent by pgbouncer when actively connected to PostgreSQL, executing queries"},
 			"total_received":    {COUNTER, "received_bytes_total", 1, "Total volume in bytes of network traffic received by pgbouncer, shown as bytes"},
@@ -27,6 +28,8 @@ var (
 			"total_xact_time":   {COUNTER, "server_in_transaction_seconds", 1e-6, "Total number of seconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries"},
 		},
 		"pools": {
+			"database":   {LABEL, "N/A", 1, "N/A"},
+			"user":       {LABEL, "N/A", 1, "N/A"},
 			"cl_active":  {GAUGE, "client_active_connections", 1, "Client connections linked to server connection and able to process queries, shown as connection"},
 			"cl_waiting": {GAUGE, "client_waiting_connections", 1, "Client connections waiting on a server connection, shown as connection"},
 			"sv_active":  {GAUGE, "server_active_connections", 1, "Server connections linked to a client connection, shown as connection"},
@@ -111,33 +114,33 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	nonfatalErrors := []error{}
 
 	for rows.Next() {
-		var database string
-		var user string
+		labelValues := make([]string, len(mapping.labels))
 		err = rows.Scan(scanArgs...)
 		if err != nil {
 			return []error{}, errors.New(fmt.Sprintln("Error retrieving rows:", namespace, err))
+		}
+
+		for i, label := range mapping.labels {
+			for idx, columnName := range columnNames {
+				if columnName == label {
+					labelValues[i] = columnData[idx].(string)
+
+					// Prometheus will fail hard if the database and usernames are not UTF-8
+					if !utf8.ValidString(labelValues[i]) {
+						nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Column %s in %s has an invalid UTF-8 for a label: %s ", columnName, namespace, columnData[idx])))
+						continue
+					}
+				}
+			}
 		}
 
 		// Loop over column names, and match to scan data. Unknown columns
 		// will be filled with an untyped metric number *if* they can be
 		// converted to float64s. NULLs are allowed and treated as NaN.
 		for idx, columnName := range columnNames {
-			if columnName == "database" {
-				log.Debug("Fetching data for row belonging to database ", columnData[idx])
-				database = columnData[idx].(string)
-			} else if columnName == "user" {
-				log.Debug("Fetching data for row belonging to user ", columnData[idx])
-				user = columnData[idx].(string)
-			}
-
 			if metricMapping, ok := mapping.columnMappings[columnName]; ok {
 				// Is this a metricy metric?
 				if metricMapping.discard {
-					continue
-				}
-
-				// Prometheus will fail hard if the database and usernames are not UTF-8
-				if !utf8.ValidString(database) || !utf8.ValidString(user) {
 					continue
 				}
 
@@ -147,7 +150,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 					continue
 				}
 				// Generate the metric
-				ch <- prometheus.MustNewConstMetric(metricMapping.desc, metricMapping.vtype, value, database, user)
+				ch <- prometheus.MustNewConstMetric(metricMapping.desc, metricMapping.vtype, value, labelValues...)
 			}
 		}
 	}
@@ -309,6 +312,15 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 
 	for metricNamespace, mappings := range metricMaps {
 		thisMap := make(map[string]MetricMap)
+		var labels = make([]string, 0)
+
+		// First collect all the labels since the metrics will need them
+		for columnName, columnMapping := range mappings {
+			if columnMapping.usage == LABEL {
+				log.Debugf("Adding label \"%s\" for %s\n", columnName, metricNamespace)
+				labels = append(labels, columnName)
+			}
+		}
 
 		for columnName, columnMapping := range mappings {
 			// Determine how to convert the column based on its usage.
@@ -316,7 +328,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 			case COUNTER:
 				thisMap[columnName] = MetricMap{
 					vtype: prometheus.CounterValue,
-					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, []string{"database", "user"}, nil),
+					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, labels, nil),
 					conversion: func(in interface{}) (float64, bool) {
 						return dbToFloat64(in, columnMapping.factor)
 					},
@@ -324,7 +336,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 			case GAUGE:
 				thisMap[columnName] = MetricMap{
 					vtype: prometheus.GaugeValue,
-					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, []string{"database", "user"}, nil),
+					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, labels, nil),
 					conversion: func(in interface{}) (float64, bool) {
 						return dbToFloat64(in, columnMapping.factor)
 					},
@@ -332,7 +344,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 			}
 		}
 
-		metricMap[metricNamespace] = MetricMapNamespace{thisMap}
+		metricMap[metricNamespace] = MetricMapNamespace{thisMap, labels}
 	}
 
 	return metricMap
