@@ -309,14 +309,15 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 // Turn the MetricMap column mapping into a prometheus descriptor mapping.
 func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace string) map[string]MetricMapNamespace {
 	var metricMap = make(map[string]MetricMapNamespace)
-	var labels = make([]string, 1)
 
 	for metricNamespace, mappings := range metricMaps {
 		thisMap := make(map[string]MetricMap)
+		var labels = make([]string, 0)
 
 		// First collect all the labels since the metrics will need them
 		for columnName, columnMapping := range mappings {
 			if columnMapping.usage == LABEL {
+				log.Debugf("Adding label \"%s\" for %s\n", columnName, metricNamespace)
 				labels = append(labels, columnName)
 			}
 		}
