@@ -16,7 +16,12 @@ else
     OS_detected := $(shell uname -s)
 endif
 
-build: $(PROMU)
+.PHONY: govendor_sync
+govendor_sync:
+	@echo ">> syncing vendoring"
+	govendor sync
+
+build: govendor_sync $(PROMU)
 	@echo ">> building binaries"
 	@$(PROMU) build --prefix $(PREFIX)
 

@@ -31,3 +31,6 @@ dependencies-stamp
 
 /.idea
 *.iml
+
+# Ignore local vendoring
+vendor/*/
