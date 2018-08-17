@@ -12,6 +12,11 @@ To see all available configuration flags:
 
     ./pgbouncer_exporter -h
 
+## Run with Docker
+
+```
+docker run chriscowley/pgbouncer_exporter -pgBouncer.connectionString=postgres://postgres:@pgbouncer:6432/pgbouncer?sslmode=disable
+```
 
 ## Metrics
 
