@@ -5,7 +5,7 @@ WORKDIR /go/src/github.com/stanhu/pgbouncer_exporter
 RUN PREFIX=/go/bin/ make
 
 
-FROM quay.io/prometheus/busybox
+FROM alpine
 WORKDIR /app
 COPY --from=build-env /go/bin/pgbouncer_exporter /app/
 EXPOSE 9127
