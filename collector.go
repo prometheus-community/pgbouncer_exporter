@@ -127,7 +127,8 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 
 					// Prometheus will fail hard if the database and usernames are not UTF-8
 					if !utf8.ValidString(labelValues[i]) {
-						nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Column %s in %s has an invalid UTF-8 for a label: %s ", columnName, namespace, columnData[idx])))
+						nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Column %s in %s has an invalid UTF-8 for a label: %s ", columnName, namespace, columnData[idx]))
+						labelValues[i] = "<invalid>"
 						continue
 					}
 				}
