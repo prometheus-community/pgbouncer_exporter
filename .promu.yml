@@ -1,5 +1,3 @@
-go:
-    cgo: true
 repository:
     path: github.com/stanhu/pgbouncer_exporter
 build:
