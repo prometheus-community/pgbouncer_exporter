@@ -163,9 +163,10 @@ func getDB(conn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = db.Ping()
+	rows, err := db.Query("SHOW STATS")
+	defer rows.Close()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error pinging pgbouncer: %q", err)
 	}
 
 	db.SetMaxOpenConns(1)
