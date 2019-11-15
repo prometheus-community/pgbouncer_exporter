@@ -16,6 +16,20 @@ import (
 
 var (
 	metricMaps = map[string]map[string]ColumnMapping{
+		"databases": {
+			"name":                {LABEL, "N/A", 1, "N/A"},
+			"host":                {LABEL, "N/A", 1, "N/A"},
+			"port":                {LABEL, "N/A", 1, "N/A"},
+			"database":            {LABEL, "N/A", 1, "N/A"},
+			"force_user":          {LABEL, "N/A", 1, "N/A"},
+			"pool_size":           {GAUGE, "pool_size", 1, "Maximum number of server connections"},
+			"reserve_pool:":       {GAUGE, "reserve_pool", 1, "Maximum number of additional connections for this database"},
+			"pool_mode":           {LABEL, "N/A", 1, "N/A"},
+			"max_connections":     {GAUGE, "max_connections", 1, "Maximum number of allowed connections for this database"},
+			"current_connections": {GAUGE, "current_connections", 1, "Current number of connections for this database"},
+			"paused":              {GAUGE, "paused", 1, "1 if this database is currently paused, else 0"},
+			"disabled":            {GAUGE, "disabled", 1, "1 if this database is currently disabled, else 0"},
+		},
 		"stats": {
 			"database":          {LABEL, "N/A", 1, "N/A"},
 			"total_query_count": {COUNTER, "queries_pooled_total", 1, "Total number of SQL queries pooled"},
@@ -123,7 +137,22 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 		for i, label := range mapping.labels {
 			for idx, columnName := range columnNames {
 				if columnName == label {
-					labelValues[i] = columnData[idx].(string)
+					switch v := columnData[idx].(type) {
+					case int:
+						labelValues[i] = strconv.Itoa(columnData[idx].(int))
+					case int64:
+						labelValues[i] = strconv.Itoa(int(columnData[idx].(int64)))
+					case float64:
+						labelValues[i] = fmt.Sprintf("%f", columnData[idx].(float64))
+					case string:
+						labelValues[i] = columnData[idx].(string)
+					case nil:
+						labelValues[i] = ""
+					default:
+						nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Column %s in %s has an unhandled type %v for label: %s ", columnName, namespace, v, columnData[idx]))
+						labelValues[i] = "<invalid>"
+						continue
+					}
 
 					// Prometheus will fail hard if the database and usernames are not UTF-8
 					if !utf8.ValidString(labelValues[i]) {
