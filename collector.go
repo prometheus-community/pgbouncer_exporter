@@ -184,6 +184,10 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 			}
 		}
 	}
+	if err := rows.Err(); err != nil {
+		log.Errorf("Failed scaning all rows due to scan failure: error was; %s", err)
+		nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintf("Failed to consume all rows due to: %s", err)))
+	}
 	return nonfatalErrors, nil
 }
 
