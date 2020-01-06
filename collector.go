@@ -56,6 +56,15 @@ var (
 	}
 )
 
+// Metric descriptors.
+var (
+	bouncerVersionDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "version", "info"),
+		"The pgbouncer version info",
+		[]string{"version",}, nil,
+	)
+)
+
 func NewExporter(connectionString string, namespace string) *Exporter {
 
 	db, err := getDB(connectionString)
@@ -285,6 +294,41 @@ func queryNamespaceMappings(ch chan<- prometheus.Metric, db *sql.DB, metricMap m
 	return namespaceErrors
 }
 
+// Gather the pgbouncer version info.
+func queryVersion(ch chan<- prometheus.Metric, db *sql.DB) error {
+	rows, err := db.Query("SHOW VERSION;")
+	if err != nil {
+		return errors.New(fmt.Sprintf("error getting pgbouncer version: %v",  err))
+	}
+	defer rows.Close()
+
+	var columnNames []string
+	columnNames, err = rows.Columns()
+	if err != nil {
+		return errors.New(fmt.Sprintf("error retrieving column list for version: %v", err))
+	}
+	if len(columnNames) != 1 || columnNames[0] != "version" {
+		return errors.New("show version didn't return version column")
+	}
+
+	var bouncerVersion string
+
+	for rows.Next() {
+		err := rows.Scan(&bouncerVersion)
+		if err != nil {
+			return err
+		}
+		ch <- prometheus.MustNewConstMetric(
+			bouncerVersionDesc,
+			prometheus.GaugeValue,
+			1.0,
+			bouncerVersion,
+		)
+	}
+
+	return nil
+}
+
 // Describe implements prometheus.Collector.
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	// We cannot know in advance what metrics the exporter will generate
@@ -334,9 +378,15 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 	e.mutex.RLock()
 	defer e.mutex.RUnlock()
 
+	err := queryVersion(ch, e.db)
+	if err != nil {
+		log.Error(err)
+		e.error.Set(1)
+	}
+
 	errMap := queryNamespaceMappings(ch, e.db, e.metricMap)
 	if len(errMap) > 0 {
-		log.Fatal(errMap)
+		log.Error(errMap)
 		e.error.Set(1)
 	}
 }
