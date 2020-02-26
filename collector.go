@@ -61,7 +61,7 @@ var (
 	bouncerVersionDesc = prometheus.NewDesc(
 		prometheus.BuildFQName(namespace, "version", "info"),
 		"The pgbouncer version info",
-		[]string{"version",}, nil,
+		[]string{"version"}, nil,
 	)
 )
 
@@ -206,10 +206,10 @@ func getDB(conn string) (*sql.DB, error) {
 		return nil, err
 	}
 	rows, err := db.Query("SHOW STATS")
-	defer rows.Close()
 	if err != nil {
 		return nil, fmt.Errorf("error pinging pgbouncer: %q", err)
 	}
+	defer rows.Close()
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
@@ -298,7 +298,7 @@ func queryNamespaceMappings(ch chan<- prometheus.Metric, db *sql.DB, metricMap m
 func queryVersion(ch chan<- prometheus.Metric, db *sql.DB) error {
 	rows, err := db.Query("SHOW VERSION;")
 	if err != nil {
-		return errors.New(fmt.Sprintf("error getting pgbouncer version: %v",  err))
+		return errors.New(fmt.Sprintf("error getting pgbouncer version: %v", err))
 	}
 	defer rows.Close()
 
