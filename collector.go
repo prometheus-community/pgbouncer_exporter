@@ -408,6 +408,8 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 		}
 
 		for columnName, columnMapping := range mappings {
+			factor := columnMapping.factor
+
 			// Determine how to convert the column based on its usage.
 			switch columnMapping.usage {
 			case COUNTER:
@@ -415,7 +417,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 					vtype: prometheus.CounterValue,
 					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, labels, nil),
 					conversion: func(in interface{}) (float64, bool) {
-						return dbToFloat64(in, columnMapping.factor)
+						return dbToFloat64(in, factor)
 					},
 				}
 			case GAUGE:
@@ -423,7 +425,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 					vtype: prometheus.GaugeValue,
 					desc:  prometheus.NewDesc(fmt.Sprintf("%s_%s_%s", namespace, metricNamespace, columnMapping.metric), columnMapping.description, labels, nil),
 					conversion: func(in interface{}) (float64, bool) {
-						return dbToFloat64(in, columnMapping.factor)
+						return dbToFloat64(in, factor)
 					},
 				}
 			}
