@@ -206,10 +206,10 @@ func getDB(conn string) (*sql.DB, error) {
 		return nil, err
 	}
 	rows, err := db.Query("SHOW STATS")
-	defer rows.Close()
 	if err != nil {
 		return nil, fmt.Errorf("error pinging pgbouncer: %q", err)
 	}
+	defer rows.Close()
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
