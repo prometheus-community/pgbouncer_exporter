@@ -389,6 +389,11 @@ func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
 		log.Error(errMap)
 		e.error.Set(1)
 	}
+
+	e.up.Set(1)
+	if len(errMap) == len(e.metricMap) {
+		e.up.Set(0)
+	}
 }
 
 // Turn the MetricMap column mapping into a prometheus descriptor mapping.
