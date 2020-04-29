@@ -1,11 +1,12 @@
 # PgBouncer exporter
+[![Build Status](https://circleci.com/gh/prometheus-community/pgbouncer_exporter.svg?style=svg)](https://circleci.com/gh/prometheus-community/pgbouncer_exporter)
 
 Prometheus exporter for PgBouncer.
 Exports metrics at `9127/metrics`
 
 ## Building and running
 
-    make
+    make build
     ./pgbouncer_exporter <flags>
 
 To see all available configuration flags:

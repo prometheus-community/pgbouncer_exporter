@@ -1,6 +1,6 @@
-module github.com/stanhu/pgbouncer_exporter
+module github.com/prometheus-community/pgbouncer_exporter
 
-go 1.13
+go 1.14
 
 require (
 	github.com/alecthomas/units v0.0.0-20190924025748-f65c72e2690d // indirect
