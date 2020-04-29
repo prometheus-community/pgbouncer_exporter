@@ -255,7 +255,7 @@ func dbToFloat64(t interface{}, factor float64) (float64, bool) {
 		if err != nil {
 			return math.NaN(), false
 		}
-		return result, true
+		return result * factor, true
 	case string:
 		result, err := strconv.ParseFloat(v, 64)
 		if err != nil {
