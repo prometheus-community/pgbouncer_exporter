@@ -1,3 +1,16 @@
+// Copyright 2020 The Prometheus Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -75,7 +88,6 @@ func NewExporter(connectionString string, namespace string) *Exporter {
 
 	return &Exporter{
 		metricMap: makeDescMap(metricMaps, namespace),
-		namespace: namespace,
 		db:        db,
 		up: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
@@ -195,7 +207,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	}
 	if err := rows.Err(); err != nil {
 		log.Errorf("Failed scaning all rows due to scan failure: error was; %s", err)
-		nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintf("Failed to consume all rows due to: %s", err)))
+		nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Failed to consume all rows due to: %s", err))
 	}
 	return nonfatalErrors, nil
 }
@@ -215,27 +227,6 @@ func getDB(conn string) (*sql.DB, error) {
 	db.SetMaxIdleConns(1)
 
 	return db, nil
-}
-
-// Convert database.sql to string for Prometheus labels. Null types are mapped to empty strings.
-func dbToString(t interface{}) (string, bool) {
-	switch v := t.(type) {
-	case int64:
-		return fmt.Sprintf("%v", v), true
-	case float64:
-		return fmt.Sprintf("%v", v), true
-	case time.Time:
-		return fmt.Sprintf("%v", v.Unix()), true
-	case nil:
-		return "", true
-	case []byte:
-		// Try and convert to string
-		return string(v), true
-	case string:
-		return v, true
-	default:
-		return "", false
-	}
 }
 
 // Convert database.sql types to float64s for Prometheus consumption. Null types are mapped to NaN. string and []byte
@@ -298,14 +289,14 @@ func queryNamespaceMappings(ch chan<- prometheus.Metric, db *sql.DB, metricMap m
 func queryVersion(ch chan<- prometheus.Metric, db *sql.DB) error {
 	rows, err := db.Query("SHOW VERSION;")
 	if err != nil {
-		return errors.New(fmt.Sprintf("error getting pgbouncer version: %v", err))
+		return fmt.Errorf("error getting pgbouncer version: %v", err)
 	}
 	defer rows.Close()
 
 	var columnNames []string
 	columnNames, err = rows.Columns()
 	if err != nil {
-		return errors.New(fmt.Sprintf("error retrieving column list for version: %v", err))
+		return fmt.Errorf("error retrieving column list for version: %v", err)
 	}
 	if len(columnNames) != 1 || columnNames[0] != "version" {
 		return errors.New("show version didn't return version column")
