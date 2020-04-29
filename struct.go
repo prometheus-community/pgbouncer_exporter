@@ -1,3 +1,16 @@
+// Copyright 2020 The Prometheus Authors
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 // Elasticsearch Node Stats Structs
@@ -73,9 +86,8 @@ type MetricMapNamespace struct {
 // Stores the prometheus metric description which a given column will be mapped
 // to by the collector
 type MetricMap struct {
-	discard    bool                 // Should metric be discarded during mapping?
-	vtype      prometheus.ValueType // Prometheus valuetype
-	namespace  string
+	discard    bool                              // Should metric be discarded during mapping?
+	vtype      prometheus.ValueType              // Prometheus valuetype
 	desc       *prometheus.Desc                  // Prometheus descriptor
 	conversion func(interface{}) (float64, bool) // Conversion function to turn PG result into float64
 }
@@ -90,9 +102,7 @@ type ColumnMapping struct {
 // Exporter collects PgBouncer stats from the given server and exports
 // them using the prometheus metrics package.
 type Exporter struct {
-	connectionString string
-	namespace        string
-	mutex            sync.RWMutex
+	mutex sync.RWMutex
 
 	duration, up, error prometheus.Gauge
 	totalScrapes        prometheus.Counter
