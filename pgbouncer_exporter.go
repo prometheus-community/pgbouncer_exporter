@@ -42,9 +42,17 @@ const (
 
 func main() {
 	var (
-		connectionStringPointer = kingpin.Flag("pgBouncer.connectionString", "Connection string for accessing pgBouncer.").Default("postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable").String()
-		listenAddress           = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9127").String()
-		metricsPath             = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
+		connectionStringPointer = kingpin.Flag(
+			"pgBouncer.connectionString", "Connection string for accessing pgBouncer($PGBOUNCER_EXPORTER_CONNECTION_STRING).",
+		).Envar("PGBOUNCER_EXPORTER_CONNECTION_STRING").Default("postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable").String()
+
+		listenAddress = kingpin.Flag(
+			"web.listen-address", "Address on which to expose metrics and web interface($PGBOUNCER_EXPORTER_WEB_LISTEN_ADDRESS).",
+		).Envar("PGBOUNCER_EXPORTER_WEB_LISTEN_ADDRESS").Default(":9127").String()
+
+		metricsPath = kingpin.Flag(
+			"web.telemetry-path", "Path under which to expose metrics($PGBOUNCER_EXPORTER_WEB_TELEMETRY_PATH).",
+		).Envar("PGBOUNCER_EXPORTER_WEB_TELEMETRY_PATH").Default("/metrics").String()
 	)
 
 	log.AddFlags(kingpin.CommandLine)
