@@ -13,6 +13,13 @@ To see all available configuration flags:
 
     ./pgbouncer_exporter -h
 
+## Flags
+
+|Flag / Environment Variable|Default|Description|
+|---------------------------|-------|-----------|
+`pgBouncer.connectionString`<br>`PGBOUNCER_EXPORTER_CONNECTION_STRING` | postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable | Connection string for accessing pgBouncer
+`web.listen-address`<br>`PGBOUNCER_EXPORTER_WEB_LISTEN_ADDRESS` | 9127 | Address on which to expose metrics and web interface
+`web.telemetry-path`<br>`PGBOUNCER_EXPORTER_WEB_TELEMETRY_PATH` | /metrics | Path under which to expose metrics
 
 ## Metrics
 
