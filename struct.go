@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -110,4 +111,6 @@ type Exporter struct {
 	metricMap map[string]MetricMapNamespace
 
 	db *sql.DB
+
+	logger log.Logger
 }
