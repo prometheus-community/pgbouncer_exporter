@@ -15,7 +15,10 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -41,10 +44,20 @@ const (
 )
 
 func main() {
+	const pidFileHelpText = `Path to PgBouncer pid file.
+
+	If provided, the standard process metrics get exported for the PgBouncer
+	process, prefixed with 'pgbouncer_process_...'. The pgbouncer_process exporter
+	needs to have read access to files owned by the PgBouncer process. Depends on
+	the availability of /proc.
+
+	https://prometheus.io/docs/instrumenting/writing_clientlibs/#process-metrics.`
+
 	var (
 		connectionStringPointer = kingpin.Flag("pgBouncer.connectionString", "Connection string for accessing pgBouncer.").Default("postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable").String()
 		listenAddress           = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9127").String()
 		metricsPath             = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
+		pidFilePath             = kingpin.Flag("pgBouncer.pid-file", pidFileHelpText).Default("").String()
 	)
 
 	log.AddFlags(kingpin.CommandLine)
@@ -58,6 +71,24 @@ func main() {
 	prometheus.MustRegister(version.NewCollector("pgbouncer_exporter"))
 
 	log.Infoln("Starting pgbouncer exporter version: ", version.Info())
+
+	if *pidFilePath != "" {
+		procExporter := prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{
+			PidFn: func() (int, error) {
+				content, err := ioutil.ReadFile(*pidFilePath)
+				if err != nil {
+					return 0, fmt.Errorf("can't read pid file: %s", err)
+				}
+				value, err := strconv.Atoi(strings.TrimSpace(string(content)))
+				if err != nil {
+					return 0, fmt.Errorf("can't parse pid file: %s", err)
+				}
+				return value, nil
+			},
+			Namespace: namespace,
+		})
+		prometheus.MustRegister(procExporter)
+	}
 
 	http.Handle(*metricsPath, promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
