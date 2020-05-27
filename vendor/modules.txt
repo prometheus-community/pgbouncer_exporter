@@ -20,7 +20,7 @@ github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
-# github.com/lib/pq v1.4.0
+# github.com/lib/pq v1.5.2
 ## explicit
 github.com/lib/pq
 github.com/lib/pq/oid
