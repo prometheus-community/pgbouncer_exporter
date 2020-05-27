@@ -1,5 +1,6 @@
 ## master / unreleased
 
+* [CHANGE] Switch logging to promlog
 * [FEATURE] Add pgbouncer process metrics
 
 ## 0.2.0 / 2020-04-29

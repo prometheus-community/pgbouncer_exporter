@@ -17,12 +17,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
+	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/log"
+	"github.com/prometheus/common/promlog"
+	"github.com/prometheus/common/promlog/flag"
 	"github.com/prometheus/common/version"
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -53,6 +56,9 @@ func main() {
 
 	https://prometheus.io/docs/instrumenting/writing_clientlibs/#process-metrics.`
 
+	promlogConfig := &promlog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promlogConfig)
+
 	var (
 		connectionStringPointer = kingpin.Flag("pgBouncer.connectionString", "Connection string for accessing pgBouncer.").Default("postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable").String()
 		listenAddress           = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9127").String()
@@ -60,17 +66,19 @@ func main() {
 		pidFilePath             = kingpin.Flag("pgBouncer.pid-file", pidFileHelpText).Default("").String()
 	)
 
-	log.AddFlags(kingpin.CommandLine)
 	kingpin.Version(version.Print("pgbouncer_exporter"))
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
+	logger := promlog.New(promlogConfig)
+
 	connectionString := *connectionStringPointer
-	exporter := NewExporter(connectionString, namespace)
+	exporter := NewExporter(connectionString, namespace, logger)
 	prometheus.MustRegister(exporter)
 	prometheus.MustRegister(version.NewCollector("pgbouncer_exporter"))
 
-	log.Infoln("Starting pgbouncer exporter version: ", version.Info())
+	level.Info(logger).Log("msg", "Starting stackdriver_exporter", "version", version.Info())
+	level.Info(logger).Log("msg", "Build context", "build_context", version.BuildContext())
 
 	if *pidFilePath != "" {
 		procExporter := prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{
@@ -95,5 +103,9 @@ func main() {
 		w.Write([]byte(fmt.Sprintf(indexHTML, *metricsPath)))
 	})
 
-	log.Fatal(http.ListenAndServe(*listenAddress, nil))
+	level.Info(logger).Log("msg", "Listening on", "address", *listenAddress)
+	if err := http.ListenAndServe(*listenAddress, nil); err != nil {
+		level.Error(logger).Log("err", err)
+		os.Exit(1)
+	}
 }
