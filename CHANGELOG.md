@@ -1,5 +1,7 @@
 ## master / unreleased
 
+* [CHANGE] Cleanup exporter metrics #33
+
 ## 0.3.0 / 2020-05-27
 
 * [CHANGE] Switch logging to promlog #29
