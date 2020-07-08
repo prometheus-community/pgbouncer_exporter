@@ -69,6 +69,42 @@ var (
 			"maxwait":    {GAUGE, "client_maxwait_seconds", 1, "Age of oldest unserved client connection, shown as second"},
 		},
 	}
+
+	listsMap = map[string]*(prometheus.Desc){
+		"databases": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "databases"),
+			"Count of databases", nil, nil),
+		"users": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "users"),
+			"Count of users", nil, nil),
+		"pools": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "pools"),
+			"Count of pools", nil, nil),
+		"free_clients": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "free_clients"),
+			"Count of free clients", nil, nil),
+		"used_clients": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "used_clients"),
+			"Count of used clients", nil, nil),
+		"login_clients": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "login_clients"),
+			"Count of clients in login state", nil, nil),
+		"free_servers": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "free_servers"),
+			"Count of free servers", nil, nil),
+		"used_servers": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "used_servers"),
+			"Count of used servers", nil, nil),
+		"dns_names": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "cached_dns_names"),
+			"Count of DNS names in the cache", nil, nil),
+		"dns_zones": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "cached_dns_zones"),
+			"Count of DNS zones in the cache", nil, nil),
+		"dns_queries": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "in_flight_dns_queries"),
+			"Count of in-flight DNS queries", nil, nil),
+	}
 )
 
 // Metric descriptors.
@@ -101,6 +137,38 @@ func NewExporter(connectionString string, namespace string, logger log.Logger) *
 	}
 }
 
+// Query SHOW LISTS, which has a series of rows, not columns.
+func queryShowLists(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) error {
+	rows, err := db.Query("SHOW LISTS;")
+	if err != nil {
+		return errors.New(fmt.Sprintln("error running SHOW LISTS on database: ", err))
+	}
+	defer rows.Close()
+
+	columnNames, err := rows.Columns()
+	if err != nil || len(columnNames) != 2 {
+		return errors.New(fmt.Sprintln("error retrieving columns list from SHOW LISTS: ", err))
+	}
+
+	var list string
+	var items sql.RawBytes
+	for rows.Next() {
+		if err = rows.Scan(&list, &items); err != nil {
+			return errors.New(fmt.Sprintln("error retrieving SHOW LISTS rows:", err))
+		}
+		value, err := strconv.ParseFloat(string(items), 64)
+		if err != nil {
+			return errors.New(fmt.Sprintln("error parsing SHOW LISTS column: ", list, err))
+		}
+		if metric, ok := listsMap[list]; ok {
+			ch <- prometheus.MustNewConstMetric(metric, prometheus.GaugeValue, value)
+		} else {
+			level.Debug(logger).Log("msg", "SHOW LISTS unknown list", "list", list)
+		}
+	}
+	return nil
+}
+
 // Query within a namespace mapping and emit metrics. Returns fatal errors if
 // the scrape fails, and a slice of errors if they were non-fatal.
 func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace string, mapping MetricMapNamespace, logger log.Logger) ([]error, error) {
@@ -109,7 +177,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	// Don't fail on a bad scrape of one metric
 	rows, err := db.Query(query)
 	if err != nil {
-		return []error{}, errors.New(fmt.Sprintln("Error running query on database: ", namespace, err))
+		return []error{}, errors.New(fmt.Sprintln("error running query on database: ", namespace, err))
 	}
 
 	defer rows.Close()
@@ -117,7 +185,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	var columnNames []string
 	columnNames, err = rows.Columns()
 	if err != nil {
-		return []error{}, errors.New(fmt.Sprintln("Error retrieving column list for: ", namespace, err))
+		return []error{}, errors.New(fmt.Sprintln("error retrieving column list for: ", namespace, err))
 	}
 
 	// Make a lookup map for the column indices
@@ -138,7 +206,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 		labelValues := make([]string, len(mapping.labels))
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			return []error{}, errors.New(fmt.Sprintln("Error retrieving rows:", namespace, err))
+			return []error{}, errors.New(fmt.Sprintln("error retrieving rows:", namespace, err))
 		}
 
 		for i, label := range mapping.labels {
@@ -156,14 +224,14 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 					case nil:
 						labelValues[i] = ""
 					default:
-						nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Column %s in %s has an unhandled type %v for label: %s ", columnName, namespace, v, columnData[idx]))
+						nonfatalErrors = append(nonfatalErrors, fmt.Errorf("column %s in %s has an unhandled type %v for label: %s ", columnName, namespace, v, columnData[idx]))
 						labelValues[i] = "<invalid>"
 						continue
 					}
 
 					// Prometheus will fail hard if the database and usernames are not UTF-8
 					if !utf8.ValidString(labelValues[i]) {
-						nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Column %s in %s has an invalid UTF-8 for a label: %s ", columnName, namespace, columnData[idx]))
+						nonfatalErrors = append(nonfatalErrors, fmt.Errorf("column %s in %s has an invalid UTF-8 for a label: %s ", columnName, namespace, columnData[idx]))
 						labelValues[i] = "<invalid>"
 						continue
 					}
@@ -183,7 +251,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 
 				value, ok := metricMapping.conversion(columnData[idx])
 				if !ok {
-					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("Unexpected error parsing column: ", namespace, columnName, columnData[idx])))
+					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("unexpected error parsing column: ", namespace, columnName, columnData[idx])))
 					continue
 				}
 				// Generate the metric
@@ -342,6 +410,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	err := queryVersion(ch, e.db)
 	if err != nil {
 		level.Error(e.logger).Log("msg", "error getting version", "err", err)
+		up = 0
+	}
+
+	if err = queryShowLists(ch, e.db, e.logger); err != nil {
+		level.Error(e.logger).Log("msg", "error getting SHOW LISTS", "err", err)
 		up = 0
 	}
 
