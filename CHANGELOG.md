@@ -6,7 +6,8 @@ Counter names have been updated to match Prometheus naming conventions.
 * `pgbouncer_stats_server_in_transaction_seconds` -> `pgbouncer_stats_server_in_transaction_seconds_total`
 
 * [CHANGE] Cleanup exporter metrics #33
-* [CHANGE] Update counter metric names
+* [CHANGE] Update counter metric names #35
+* [FEATURE] Add support for SHOW LISTS metrics #36
 
 ## 0.3.0 / 2020-05-27
 
