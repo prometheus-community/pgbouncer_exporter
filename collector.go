@@ -78,6 +78,11 @@ var (
 		"The pgbouncer version info",
 		[]string{"version"}, nil,
 	)
+	scrapeSuccessDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "", "up"),
+		"The pgbouncer scrape succeeded",
+		nil, nil,
+	)
 )
 
 func NewExporter(connectionString string, namespace string, logger log.Logger) *Exporter {
@@ -93,29 +98,6 @@ func NewExporter(connectionString string, namespace string, logger log.Logger) *
 		metricMap: makeDescMap(metricMaps, namespace, logger),
 		db:        db,
 		logger:    logger,
-		up: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "up",
-			Help:      "Was the PgBouncer instance query successful?",
-		}),
-
-		duration: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "last_scrape_duration_seconds",
-			Help:      "Duration of the last scrape of metrics from PgBouncer.",
-		}),
-
-		totalScrapes: prometheus.NewCounter(prometheus.CounterOpts{
-			Namespace: namespace,
-			Name:      "scrapes_total",
-			Help:      "Total number of times PgBouncer has been scraped for metrics.",
-		}),
-
-		error: prometheus.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "last_scrape_error",
-			Help:      "Whether the last scrape of metrics from PgBouncer resulted in an error (1 for error, 0 for success).",
-		}),
 	}
 }
 
@@ -353,41 +335,26 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	e.scrape(ch)
-	ch <- e.duration
-	ch <- e.up
-	ch <- e.totalScrapes
-	ch <- e.error
-}
-
-func (e *Exporter) scrape(ch chan<- prometheus.Metric) {
-	defer func(begun time.Time) {
-		e.duration.Set(time.Since(begun).Seconds())
-	}(time.Now())
 	level.Info(e.logger).Log("msg", "Starting scrape")
 
-	e.error.Set(0)
-	e.totalScrapes.Inc()
-
-	e.mutex.RLock()
-	defer e.mutex.RUnlock()
+	var up float64 = 1.0
 
 	err := queryVersion(ch, e.db)
 	if err != nil {
 		level.Error(e.logger).Log("msg", "error getting version", "err", err)
-		e.error.Set(1)
+		up = 0
 	}
 
 	errMap := queryNamespaceMappings(ch, e.db, e.metricMap, e.logger)
 	if len(errMap) > 0 {
 		level.Error(e.logger).Log("msg", "error querying namespace mappings", "err", errMap)
-		e.error.Set(1)
+		up = 0
 	}
 
-	e.up.Set(1)
 	if len(errMap) == len(e.metricMap) {
-		e.up.Set(0)
+		up = 0
 	}
+	ch <- prometheus.MustNewConstMetric(scrapeSuccessDesc, prometheus.GaugeValue, up)
 }
 
 // Turn the MetricMap column mapping into a prometheus descriptor mapping.
