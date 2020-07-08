@@ -1,6 +1,12 @@
 ## master / unreleased
 
+Counter names have been updated to match Prometheus naming conventions.
+* `pgbouncer_stats_queries_duration_seconds` -> `pgbouncer_stats_queries_duration_seconds_total`
+* `pgbouncer_stats_client_wait_seconds` -> `pgbouncer_stats_client_wait_seconds_total`
+* `pgbouncer_stats_server_in_transaction_seconds` -> `pgbouncer_stats_server_in_transaction_seconds_total`
+
 * [CHANGE] Cleanup exporter metrics #33
+* [CHANGE] Update counter metric names
 
 ## 0.3.0 / 2020-05-27
 
