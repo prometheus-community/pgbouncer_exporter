@@ -1,5 +1,7 @@
 ## master / unreleased
 
+## 0.4.0 / 2020-07-09
+
 Counter names have been updated to match Prometheus naming conventions.
 * `pgbouncer_stats_queries_duration_seconds` -> `pgbouncer_stats_queries_duration_seconds_total`
 * `pgbouncer_stats_client_wait_seconds` -> `pgbouncer_stats_client_wait_seconds_total`
