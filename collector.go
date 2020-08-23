@@ -14,6 +14,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -271,11 +272,12 @@ func getDB(conn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	rows, err := db.Query("SHOW STATS")
-	if err != nil {
+
+	var ctx, cancelCtx = context.WithTimeout(context.Background(), time.Second*2)
+	defer cancelCtx()
+	if err = db.PingContext(ctx); err != nil {
 		return nil, fmt.Errorf("error pinging pgbouncer: %q", err)
 	}
-	defer rows.Close()
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)

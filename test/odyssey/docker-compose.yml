@@ -1,0 +1,29 @@
+version: '3'
+services:
+  postgres:
+    image: postgres:11
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_DB: "postgres"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+  odyssey:
+    build:
+      context: .
+      args:
+        version: 1.1
+    ports:
+      - "6532:6432"
+    volumes:
+      - ./odyssey.conf:/etc/odyssey/odyssey.conf
+
+  exporter:
+    build:
+     context: ../../
+     args:
+       DB_HOST: odyssey
+       DB_PORT: 6432
+       DB_NAME: db
+    ports:
+      - "9127:9127"
+    restart: on-failure
