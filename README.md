@@ -33,4 +33,5 @@ pools.sv_idle | pgbouncer_pools_server_idle_connections | Server connections idl
 pools.sv_used | pgbouncer_pools_server_used_connections | Server connections idle more than server_check_delay, needing server_check_query, shown as connection
 pools.sv_tested | pgbouncer_pools_server_testing_connections | Server connections currently running either server_reset_query or server_check_query, shown as connection
 pools.sv_login | pgbouncer_pools_server_login_connections | Server connections currently in the process of logging in, shown as connection
-pools.maxwait | pgbouncer_pools_client_maxwait_seconds | Age of oldest unserved client connection, shown as second
+pools.maxwait | pgbouncer_pools_client_maxwait_seconds | Age of oldest unserved client connection in full seconds
+pools.maxwait_us | pgbouncer_pools_client_maxwait_fractional | The fractional part of client_maxwait_seconds
