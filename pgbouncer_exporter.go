@@ -74,7 +74,7 @@ func main() {
 	prometheus.MustRegister(exporter)
 	prometheus.MustRegister(version.NewCollector("pgbouncer_exporter"))
 
-	level.Info(logger).Log("msg", "Starting stackdriver_exporter", "version", version.Info())
+	level.Info(logger).Log("msg", "Starting pgbouncer_exporter", "version", version.Info())
 	level.Info(logger).Log("msg", "Build context", "build_context", version.BuildContext())
 
 	if *pidFilePath != "" {
