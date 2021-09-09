@@ -19,13 +19,13 @@ To see all available configuration flags:
 |PgBouncer column|Prometheus Metric|Description|
 |----------------|-----------------|-----------|
 stats_total_query_count | pgbouncer_stats_queries_pooled_total | Total number of SQL queries pooled
-stats.total_query_time | pgbouncer_stats_queries_duration_seconds | Total number of seconds spent by pgbouncer when actively connected to PostgreSQL, executing queries
+stats.total_query_time | pgbouncer_stats_queries_duration_seconds_total | Total number of seconds spent by pgbouncer when actively connected to PostgreSQL, executing queries
 stats.total_received | pgbouncer_stats_received_bytes_total | Total volume in bytes of network traffic received by pgbouncer, shown as bytes
 stats.total_requests | pgbouncer_stats_queries_total | Total number of SQL requests pooled by pgbouncer, shown as requests
 stats.total_sent | pgbouncer_stats_sent_bytes_total | Total volume in bytes of network traffic sent by pgbouncer, shown as bytes
-stats.total_wait_time | pgbouncer_stats_client_wait_seconds | Time spent by clients waiting for a server in seconds
+stats.total_wait_time | pgbouncer_stats_client_wait_seconds_total | Time spent by clients waiting for a server in seconds
 stats.total_xact_count | pgbouncer_stats_sql_transactions_pooled_total | Total number of SQL transactions pooled
-stats.total_xact_time | pgbouncer_stats_server_in_transaction_seconds | Total number of seconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries
+stats.total_xact_time | pgbouncer_stats_server_in_transaction_seconds_total | Total number of seconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries
 pools.cl_active | pgbouncer_pools_client_active_connections | Client connections linked to server connection and able to process queries, shown as connection
 pools.cl_waiting | pgbouncer_pools_client_waiting_connections | Client connections waiting on a server connection, shown as connection
 pools.sv_active | pgbouncer_pools_server_active_connections | Server connections linked to a client connection, shown as connection
