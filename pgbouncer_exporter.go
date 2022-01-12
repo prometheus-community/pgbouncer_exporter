@@ -18,8 +18,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/promlog/flag"
@@ -78,8 +79,8 @@ func main() {
 	level.Info(logger).Log("msg", "Build context", "build_context", version.BuildContext())
 
 	if *pidFilePath != "" {
-		procExporter := prometheus.NewProcessCollector(
-			prometheus.ProcessCollectorOpts{
+		procExporter := collectors.NewProcessCollector(
+			collectors.ProcessCollectorOpts{
 				PidFn:     prometheus.NewPidFileFn(*pidFilePath),
 				Namespace: namespace,
 			},
