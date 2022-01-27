@@ -1,5 +1,10 @@
 ## master / unreleased
 
+## 0.4.1 / 2022-01-27
+
+* [BUGFIX] Fix startup log message typo #50
+* [BUGFIX] Fix typo in reserve_pool metric #67
+
 ## 0.4.0 / 2020-07-09
 
 Counter names have been updated to match Prometheus naming conventions.
