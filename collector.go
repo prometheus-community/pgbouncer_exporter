@@ -38,7 +38,7 @@ var (
 			"database":            {LABEL, "N/A", 1, "N/A"},
 			"force_user":          {LABEL, "N/A", 1, "N/A"},
 			"pool_size":           {GAUGE, "pool_size", 1, "Maximum number of server connections"},
-			"reserve_pool:":       {GAUGE, "reserve_pool", 1, "Maximum number of additional connections for this database"},
+			"reserve_pool":        {GAUGE, "reserve_pool", 1, "Maximum number of additional connections for this database"},
 			"pool_mode":           {LABEL, "N/A", 1, "N/A"},
 			"max_connections":     {GAUGE, "max_connections", 1, "Maximum number of allowed connections for this database"},
 			"current_connections": {GAUGE, "current_connections", 1, "Current number of connections for this database"},
