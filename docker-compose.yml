@@ -1,16 +1,21 @@
-version: '2'
-
+version: '2.1'
 services:
-  postgres:
-    image: postgres:9.4
-    ports:
-      - "5432"
+  postgresql:
+    image: docker.io/bitnami/postgresql:11
+    volumes:
+      - 'postgresql_data:/bitnami/postgresql'
+    environment:
+      - 'ALLOW_EMPTY_PASSWORD=yes'
 
   pgbouncer:
-    image: starefossen/pgbouncer:latest
-    links:
-      - postgres
+    image: docker.io/bitnami/pgbouncer:latest
     ports:
-      - "127.0.0.1:6543:6543"
-    volumes:
-      - ./pgbouncer.ini:/pgbouncer.ini
+      - 6543:6432
+    environment:
+      - POSTGRESQL_HOST=postgresql
+      - PGBOUNCER_AUTH_TYPE=trust
+      - PGBOUNCER_STATS_USERS=pgbouncer
+      - PGBOUNCER_IGNORE_STARTUP_PARAMETERS=extra_float_digits
+volumes:
+  postgresql_data:
+    driver: local
