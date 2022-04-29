@@ -27,13 +27,13 @@ stats.total_wait_time | pgbouncer_stats_client_wait_seconds_total | Time spent b
 stats.total_xact_count | pgbouncer_stats_sql_transactions_pooled_total | Total number of SQL transactions pooled
 stats.total_xact_time | pgbouncer_stats_server_in_transaction_seconds_total | Total number of seconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries
 stats.database | pgbouncer_stats_database | Database name
-stats.avg_xact_count | pgbouncer_stats_avg_xact_count | Average transactions per second in last stat period
-stats.avg_query_count | pgbouncer_stats_avg_query_count | Average queries per second in last stat period
-stats.avg_recv | pgbouncer_stats_avg_recv | Average received (from clients) bytes per second
-stats.avg_sent | pgbouncer_stats_avg_sent | Average sent (to clients) bytes per second
-stats.avg_xact_time | pgbouncer_stats_avg_xact_time | Average transaction duration in microseconds
-stats.avg_query_time | pgbouncer_stats_avg_query_time | Average query duration in microseconds
-stats.avg_wait_time | pgbouncer_stats_avg_wait_time | Time spent by clients waiting for a server in microseconds (average per second)
+stats.avg_xact_count | pgbouncer_stats_avg_xact_total | Average transactions per second in last stat period
+stats.avg_query_count | pgbouncer_stats_avg_query_total | Average queries per second in last stat period
+stats.avg_recv | pgbouncer_stats_avg_recv_bytes | Average received (from clients) bytes per second
+stats.avg_sent | pgbouncer_stats_avg_sent_bytes | Average sent (to clients) bytes per second
+stats.avg_xact_time | pgbouncer_stats_avg_xact_seconds | Average transaction duration in seconds
+stats.avg_query_time | pgbouncer_stats_avg_query_seconds | Average query duration in seconds
+stats.avg_wait_time | pgbouncer_stats_avg_wait_seconds | Time spent by clients waiting for a server in seconds (average per second)
 pools.cl_active | pgbouncer_pools_client_active_connections | Client connections linked to server connection and able to process queries, shown as connection
 pools.cl_waiting | pgbouncer_pools_client_waiting_connections | Client connections waiting on a server connection, shown as connection
 pools.sv_active | pgbouncer_pools_server_active_connections | Server connections linked to a client connection, shown as connection
@@ -49,27 +49,27 @@ databases.host | pgbouncer_databases_host | Host pgbouncer connects to
 databases.port | pgbouncer_databases_port | Port pgbouncer connects to
 databases.database | pgbouncer_databases_database | Actual database name pgbouncer connects to
 databases.force_user | pgbouncer_databases_force_user | When user is part of the connection string, the connection between pgbouncer and PostgreSQL is forced to the given user, whatever the client user
-databases.pool_size | pgbouncer_databases_pool_size | Maximum number of server connections
-databases.reserve_pool | pgbouncer_databases_reserve_pool | Maximum number of additional connections for this database
+databases.pool_size | pgbouncer_databases_pool_size_total | Maximum number of server connections
+databases.reserve_pool | pgbouncer_databases_reserve_pool_total | Maximum number of additional connections for this database
 databases.pool_mode | pgbouncer_databases_pool_mode | The database's override pool_mode
-databases.max_connections | pgbouncer_databases_max_connections | Maximum number of allowed connections for this database
-databases.current_connections | pgbouncer_databases_current_connections | Current number of connections for this database
+databases.max_connections | pgbouncer_databases_max_connections_total | Maximum number of allowed connections for this database
+databases.current_connections | pgbouncer_databases_current_connections_total | Current number of connections for this database
 databases.paused | pgbouncer_databases_paused | 1 if this database is currently paused, else 0
 databases.disabled | pgbouncer_databases_disabled | 1 if this database is currently disabled, else 0
-lists.databases | pgbouncer_lists_databases | Number of databases
-lists.users | pgbouncer_lists_users | Number of users
-lists.pools | pgbouncer_lists_pools | Number of pools
-lists.free_clients | pgbouncer_lists_free_clients | Number of free clients
-lists.used_clients | pgbouncer_lists_used_clients | Number of used clients
-lists.login_clients | pgbouncer_lists_login_clients | Number of clients in login state
-lists.free_servers | pgbouncer_lists_free_servers | Number of free servers
-lists.used_servers | pgbouncer_lists_used_servers | Number of used servers
-lists.dns_names | pgbouncer_lists_dns_names | dns names
-lists.dns_zones | pgbouncer_lists_dns_zones | dns zones
-lists.dns_queries | pgbouncer_lists_dns_queries | dns queries
-lists.dns_pending | pgbouncer_lists_dns_pending | dns pending
+lists.databases | pgbouncer_lists_databases_total | Number of databases
+lists.users | pgbouncer_lists_users_total | Number of users
+lists.pools | pgbouncer_lists_pools_total | Number of pools
+lists.free_clients | pgbouncer_lists_free_clients_total | Number of free clients
+lists.used_clients | pgbouncer_lists_used_clients_total | Number of used clients
+lists.login_clients | pgbouncer_lists_login_clients_total | Number of clients in login state
+lists.free_servers | pgbouncer_lists_free_servers_total | Number of free servers
+lists.used_servers | pgbouncer_lists_used_servers_total | Number of used servers
+lists.dns_names | pgbouncer_lists_dns_names_total | dns names
+lists.dns_zones | pgbouncer_lists_dns_zones_total | dns zones
+lists.dns_queries | pgbouncer_lists_dns_queries_total | dns queries
+lists.dns_pending | pgbouncer_lists_dns_pending_total | dns pending
 mem.name | pgbouncer_mem_name | mem name
-mem.size | pgbouncer_mem_size | mem size
-mem.used | pgbouncer_mem_used | mem used
-mem.free | pgbouncer_mem_free | mem free
-mem.memtotal | pgbouncer_mem_memtotal | mem total
+mem.size | pgbouncer_mem_size_total | mem size
+mem.used | pgbouncer_mem_used_total | mem used
+mem.free | pgbouncer_mem_free_total | mem free
+mem.memtotal | pgbouncer_mem_memtotal_bytes_total | mem total
