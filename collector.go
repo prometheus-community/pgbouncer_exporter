@@ -79,10 +79,10 @@ var (
 
 		"mem": {
 			"name":     {LABEL, "name", 1, "mem name"},
-			"size":     {GAUGE, "size_total", 1, "mem size"},
-			"used":     {GAUGE, "used_total", 1, "mem used"},
-			"free":     {GAUGE, "free_total", 1, "mem free"},
-			"memtotal": {GAUGE, "memtotal_bytes_total", 1, "mem total"},
+			"size":     {GAUGE, "size_bytes", 1, "mem size"},
+			"used":     {GAUGE, "used_bytes", 1, "mem used"},
+			"free":     {GAUGE, "free_bytes", 1, "mem free"},
+			"memtotal": {GAUGE, "memtotal_bytes", 1, "mem total"},
 		},
 	}
 
