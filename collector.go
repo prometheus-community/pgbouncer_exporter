@@ -76,20 +76,6 @@ var (
 			"maxwait":    {GAUGE, "client_maxwait_seconds", 1, "Age of oldest unserved client connection, shown as second"},
 			"pool_mode":  {LABEL, "pool_mode", 1, "The pooling mode in use."},
 		},
-		"lists": {
-			"databases":     {GAUGE, "databases_total", 1, "Number of databases"},
-			"users":         {GAUGE, "users_total", 1, "Number of users"},
-			"pools":         {GAUGE, "pools_total", 1, "Number of pools"},
-			"free_clients":  {GAUGE, "free_clients_total", 1, "Number of free clients"},
-			"used_clients":  {GAUGE, "used_clients_total", 1, "Number of used clients"},
-			"login_clients": {GAUGE, "login_clients_total", 1, "Number of clients in login state"},
-			"free_servers":  {GAUGE, "free_servers_total", 1, "Number of free servers"},
-			"used_servers":  {GAUGE, "used_servers_total", 1, "Number of used servers"},
-			"dns_names":     {GAUGE, "dns_names_total", 1, "dns names"},
-			"dns_zones":     {GAUGE, "dns_zones_total", 1, "dns zones"},
-			"dns_queries":   {GAUGE, "dns_queries_total", 1, "dns queries"},
-			"dns_pending":   {GAUGE, "dns_pending_total", 1, "dns pending"},
-		},
 
 		"mem": {
 			"name":     {LABEL, "name", 1, "mem name"},
@@ -102,38 +88,41 @@ var (
 
 	listsMap = map[string]*(prometheus.Desc){
 		"databases": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "databases"),
+			prometheus.BuildFQName(namespace, "lists", "databases_total"),
 			"Count of databases", nil, nil),
 		"users": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "users"),
+			prometheus.BuildFQName(namespace, "lists", "users_total"),
 			"Count of users", nil, nil),
 		"pools": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "pools"),
+			prometheus.BuildFQName(namespace, "lists", "pools_total"),
 			"Count of pools", nil, nil),
 		"free_clients": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "free_clients"),
+			prometheus.BuildFQName(namespace, "lists", "free_clients_total"),
 			"Count of free clients", nil, nil),
 		"used_clients": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "used_clients"),
+			prometheus.BuildFQName(namespace, "lists", "used_clients_total"),
 			"Count of used clients", nil, nil),
 		"login_clients": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "login_clients"),
+			prometheus.BuildFQName(namespace, "lists", "login_clients_total"),
 			"Count of clients in login state", nil, nil),
 		"free_servers": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "free_servers"),
+			prometheus.BuildFQName(namespace, "lists", "free_servers_total"),
 			"Count of free servers", nil, nil),
 		"used_servers": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "used_servers"),
+			prometheus.BuildFQName(namespace, "lists", "used_servers_total"),
 			"Count of used servers", nil, nil),
 		"dns_names": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "cached_dns_names"),
+			prometheus.BuildFQName(namespace, "lists", "cached_dns_names_total"),
 			"Count of DNS names in the cache", nil, nil),
 		"dns_zones": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "cached_dns_zones"),
+			prometheus.BuildFQName(namespace, "lists", "cached_dns_zones_total"),
 			"Count of DNS zones in the cache", nil, nil),
 		"dns_queries": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "", "in_flight_dns_queries"),
+			prometheus.BuildFQName(namespace, "lists", "in_flight_dns_queries"),
 			"Count of in-flight DNS queries", nil, nil),
+		"dns_pending": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "lists", "pending_dns_queries"),
+			"Count of pending DNS queries", nil, nil),
 	}
 )
 

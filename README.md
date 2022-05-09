@@ -56,18 +56,18 @@ databases.max_connections | pgbouncer_databases_max_connections_total | Maximum 
 databases.current_connections | pgbouncer_databases_current_connections_total | Current number of connections for this database
 databases.paused | pgbouncer_databases_paused | 1 if this database is currently paused, else 0
 databases.disabled | pgbouncer_databases_disabled | 1 if this database is currently disabled, else 0
-lists.databases | pgbouncer_lists_databases_total | Number of databases
-lists.users | pgbouncer_lists_users_total | Number of users
-lists.pools | pgbouncer_lists_pools_total | Number of pools
-lists.free_clients | pgbouncer_lists_free_clients_total | Number of free clients
-lists.used_clients | pgbouncer_lists_used_clients_total | Number of used clients
-lists.login_clients | pgbouncer_lists_login_clients_total | Number of clients in login state
-lists.free_servers | pgbouncer_lists_free_servers_total | Number of free servers
-lists.used_servers | pgbouncer_lists_used_servers_total | Number of used servers
-lists.dns_names | pgbouncer_lists_dns_names_total | dns names
-lists.dns_zones | pgbouncer_lists_dns_zones_total | dns zones
-lists.dns_queries | pgbouncer_lists_dns_queries_total | dns queries
-lists.dns_pending | pgbouncer_lists_dns_pending_total | dns pending
+lists.databases | pgbouncer_lists_databases_total | Count of databases
+lists.users | pgbouncer_lists_users_total | Count of users
+lists.pools | pgbouncer_lists_pools_total | Count of pools
+lists.free_clients | pgbouncer_lists_free_clients_total | Count of free clients
+lists.used_clients | pgbouncer_lists_used_clients_total | Count of used clients
+lists.login_clients | pgbouncer_lists_login_clients_total | Count of clients in login state
+lists.free_servers | pgbouncer_lists_free_servers_total | Count of free servers
+lists.used_servers | pgbouncer_lists_used_servers_total | Count of used servers
+lists.dns_names | pgbouncer_lists_cached_dns_names_total | Count of DNS names in the cache
+lists.dns_zones | pgbouncer_lists_cached_dns_zones_total | Count of DNS zones in the cache
+lists.dns_queries | pgbouncer_lists_in_flight_dns_queries | Count of in-flight DNS queries
+lists.dns_pending | pgbouncer_lists_pending_dns_queries | Count of pending DNS queries
 mem.name | pgbouncer_mem_name | mem name
 mem.size | pgbouncer_mem_size_total | mem size
 mem.used | pgbouncer_mem_used_total | mem used
