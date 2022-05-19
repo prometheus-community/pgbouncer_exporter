@@ -76,14 +76,6 @@ var (
 			"maxwait":    {GAUGE, "client_maxwait_seconds", 1, "Age of oldest unserved client connection, shown as second"},
 			"pool_mode":  {LABEL, "pool_mode", 1, "The pooling mode in use."},
 		},
-
-		"mem": {
-			"name":     {LABEL, "name", 1, "mem name"},
-			"size":     {GAUGE, "size_bytes", 1, "mem size"},
-			"used":     {GAUGE, "used_bytes", 1, "mem used"},
-			"free":     {GAUGE, "free_bytes", 1, "mem free"},
-			"memtotal": {GAUGE, "memtotal_bytes", 1, "mem total"},
-		},
 	}
 
 	listsMap = map[string]*(prometheus.Desc){

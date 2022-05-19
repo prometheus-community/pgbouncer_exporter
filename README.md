@@ -68,8 +68,3 @@ lists.dns_names | pgbouncer_lists_cached_dns_names_total | Count of DNS names in
 lists.dns_zones | pgbouncer_lists_cached_dns_zones_total | Count of DNS zones in the cache
 lists.dns_queries | pgbouncer_lists_in_flight_dns_queries | Count of in-flight DNS queries
 lists.dns_pending | pgbouncer_lists_pending_dns_queries | Count of pending DNS queries
-mem.name | pgbouncer_mem_name | mem name
-mem.size | pgbouncer_mem_size_total | mem size
-mem.used | pgbouncer_mem_used_total | mem used
-mem.free | pgbouncer_mem_free_total | mem free
-mem.memtotal | pgbouncer_mem_memtotal_bytes_total | mem total
