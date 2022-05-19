@@ -37,11 +37,11 @@ var (
 			"port":                {LABEL, "port", 1, "Port pgbouncer connects to."},
 			"database":            {LABEL, "database", 1, "Actual database name pgbouncer connects to."},
 			"force_user":          {LABEL, "force_user", 1, "When user is part of the connection string, the connection between pgbouncer and PostgreSQL is forced to the given user, whatever the client user."},
-			"pool_size":           {GAUGE, "pool_size_total", 1, "Maximum number of server connections"},
-			"reserve_pool":        {GAUGE, "reserve_pool_total", 1, "Maximum number of additional connections for this database"},
+			"pool_size":           {GAUGE, "pool_size", 1, "Maximum number of server connections"},
+			"reserve_pool":        {GAUGE, "reserve_pool", 1, "Maximum number of additional connections for this database"},
 			"pool_mode":           {LABEL, "pool_mode", 1, "The database's override pool_mode"},
-			"max_connections":     {GAUGE, "max_connections_total", 1, "Maximum number of allowed connections for this database"},
-			"current_connections": {GAUGE, "current_connections_total", 1, "Current number of connections for this database"},
+			"max_connections":     {GAUGE, "max_connections", 1, "Maximum number of allowed connections for this database"},
+			"current_connections": {GAUGE, "current_connections", 1, "Current number of connections for this database"},
 			"paused":              {GAUGE, "paused", 1, "1 if this database is currently paused, else 0"},
 			"disabled":            {GAUGE, "disabled", 1, "1 if this database is currently disabled, else 0"},
 		},
@@ -141,9 +141,7 @@ var (
 )
 
 func NewExporter(connectionString string, namespace string, logger log.Logger) *Exporter {
-
 	db, err := getDB(connectionString)
-
 	if err != nil {
 		level.Error(logger).Log("msg", "error setting up DB connection", "err", err)
 		os.Exit(1)
@@ -208,13 +206,13 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	}
 
 	// Make a lookup map for the column indices
-	var columnIdx = make(map[string]int, len(columnNames))
+	columnIdx := make(map[string]int, len(columnNames))
 	for i, n := range columnNames {
 		columnIdx[n] = i
 	}
 
-	var columnData = make([]interface{}, len(columnNames))
-	var scanArgs = make([]interface{}, len(columnNames))
+	columnData := make([]interface{}, len(columnNames))
+	scanArgs := make([]interface{}, len(columnNames))
 	for i := range columnData {
 		scanArgs[i] = &columnData[i]
 	}
@@ -451,11 +449,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 // Turn the MetricMap column mapping into a prometheus descriptor mapping.
 func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace string, logger log.Logger) map[string]MetricMapNamespace {
-	var metricMap = make(map[string]MetricMapNamespace)
+	metricMap := make(map[string]MetricMapNamespace)
 
 	for metricNamespace, mappings := range metricMaps {
 		thisMap := make(map[string]MetricMap)
-		var labels = make([]string, 0)
+		labels := make([]string, 0)
 
 		// First collect all the labels since the metrics will need them
 		for columnName, columnMapping := range mappings {

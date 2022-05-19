@@ -49,11 +49,11 @@ databases.host | pgbouncer_databases_host | Host pgbouncer connects to
 databases.port | pgbouncer_databases_port | Port pgbouncer connects to
 databases.database | pgbouncer_databases_database | Actual database name pgbouncer connects to
 databases.force_user | pgbouncer_databases_force_user | When user is part of the connection string, the connection between pgbouncer and PostgreSQL is forced to the given user, whatever the client user
-databases.pool_size | pgbouncer_databases_pool_size_total | Maximum number of server connections
-databases.reserve_pool | pgbouncer_databases_reserve_pool_total | Maximum number of additional connections for this database
+databases.pool_size | pgbouncer_databases_pool_size | Maximum number of server connections
+databases.reserve_pool | pgbouncer_databases_reserve_pool | Maximum number of additional connections for this database
 databases.pool_mode | pgbouncer_databases_pool_mode | The database's override pool_mode
-databases.max_connections | pgbouncer_databases_max_connections_total | Maximum number of allowed connections for this database
-databases.current_connections | pgbouncer_databases_current_connections_total | Current number of connections for this database
+databases.max_connections | pgbouncer_databases_max_connections | Maximum number of allowed connections for this database
+databases.current_connections | pgbouncer_databases_current_connections | Current number of connections for this database
 databases.paused | pgbouncer_databases_paused | 1 if this database is currently paused, else 0
 databases.disabled | pgbouncer_databases_disabled | 1 if this database is currently disabled, else 0
 lists.databases | pgbouncer_lists_databases_total | Count of databases
