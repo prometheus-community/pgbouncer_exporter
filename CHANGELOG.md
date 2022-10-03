@@ -2,6 +2,10 @@
 
 ## 0.5.1 / 2022-10-03
 
+* No changes, just retagging due to a VERSION fix.
+
+## 0.5.0 / 2022-10-03
+
 * [CHANGE] Update Go to 1.18.
 * [CHANGE] Update upstream dependencies.
 
