@@ -1,5 +1,10 @@
 ## master / unreleased
 
+## 0.5.1 / 2022-10-03
+
+* [CHANGE] Update Go to 1.18.
+* [CHANGE] Update upstream dependencies.
+
 ## 0.4.1 / 2022-01-27
 
 * [BUGFIX] Fix startup log message typo #50
