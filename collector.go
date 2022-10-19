@@ -105,6 +105,15 @@ var (
 			prometheus.BuildFQName(namespace, "", "in_flight_dns_queries"),
 			"Count of in-flight DNS queries", nil, nil),
 	}
+
+	configMap = map[string]*(prometheus.Desc){
+		"max_client_conn": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "config", "max_client_conn"),
+			"Config maximum number of client connections", nil, nil),
+		"max_user_connections": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "config", "max_user_connections"),
+			"Config maximum number of server connections per user", nil, nil),
+	}
 )
 
 // Metric descriptors.
@@ -164,6 +173,49 @@ func queryShowLists(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) 
 			ch <- prometheus.MustNewConstMetric(metric, prometheus.GaugeValue, value)
 		} else {
 			level.Debug(logger).Log("msg", "SHOW LISTS unknown list", "list", list)
+		}
+	}
+	return nil
+}
+
+// Query SHOW CONFIG, which has a series of rows, not columns.
+func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) error {
+	rows, err := db.Query(fmt.Sprintln("SHOW CONFIG;"))
+	if err != nil {
+		return errors.New(fmt.Sprintln("error running SHOW CONFIG on database: ", err))
+	}
+	defer rows.Close()
+
+	columnNames, err := rows.Columns()
+	if err != nil || len(columnNames) != 3 {
+		return errors.New(fmt.Sprintln("error retrieving columns list from SHOW CONFIG: ", err))
+	}
+
+	exposedConfig := make(map[string]bool)
+	for configKey := range configMap {
+		exposedConfig[configKey] = true
+	}
+
+	var key string
+	var values sql.RawBytes
+	var changeable string
+	for rows.Next() {
+		if err = rows.Scan(&key, &values, &changeable); err != nil {
+			return errors.New(fmt.Sprintln("error retrieving SHOW CONFIG rows:", err))
+		}
+
+		if !exposedConfig[key] {
+			continue
+		}
+
+		value, err := strconv.ParseFloat(string(values), 64)
+		if err != nil {
+			return errors.New(fmt.Sprintln("error parsing SHOW CONFIG column: ", key, err))
+		}
+		if metric, ok := configMap[key]; ok {
+			ch <- prometheus.MustNewConstMetric(metric, prometheus.GaugeValue, value)
+		} else {
+			level.Debug(logger).Log("msg", "SHOW CONFIG unknown config", "config", key)
 		}
 	}
 	return nil
@@ -415,6 +467,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	if err = queryShowLists(ch, e.db, e.logger); err != nil {
 		level.Error(e.logger).Log("msg", "error getting SHOW LISTS", "err", err)
+		up = 0
+	}
+
+	if err = queryShowConfig(ch, e.db, e.logger); err != nil {
+		level.Error(e.logger).Log("msg", "error getting SHOW CONFIG", "err", err)
 		up = 0
 	}
 
