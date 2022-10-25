@@ -2,7 +2,7 @@
 [![Build Status](https://circleci.com/gh/prometheus-community/pgbouncer_exporter.svg?style=svg)](https://circleci.com/gh/prometheus-community/pgbouncer_exporter)
 
 Prometheus exporter for PgBouncer.
-Exports metrics at `9127/metrics`
+Exports metrics at `localhost:9127/metrics` by default.
 
 ## Building and running
 
@@ -13,6 +13,14 @@ To see all available configuration flags:
 
     ./pgbouncer_exporter -h
 
+### Environment Variables
+
+The following environment variables can also be used to configure the exporter:
+
+* `PGBOUNCER_CONNECTION_STRING` set the URI for connecting to pgbouncer.
+* `PGBOUNCER_EXPORTER_WEB_LISTEN_ADDRESS` set the address for exposing metrics.
+* `PGBOUNCER_EXPORTER_WEB_TELEMETRY_PATH` set the path to expose metrics on.
+* `PGBOUNCER_PID_FILE` set the path to the PID file for pgbouncer.
 
 ## Metrics
 

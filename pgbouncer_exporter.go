@@ -58,10 +58,10 @@ func main() {
 	flag.AddFlags(kingpin.CommandLine, promlogConfig)
 
 	var (
-		connectionStringPointer = kingpin.Flag("pgBouncer.connectionString", "Connection string for accessing pgBouncer.").Default("postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable").String()
-		listenAddress           = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9127").String()
-		metricsPath             = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
-		pidFilePath             = kingpin.Flag("pgBouncer.pid-file", pidFileHelpText).Default("").String()
+		connectionStringPointer = kingpin.Flag("pgBouncer.connectionString", "Connection string for accessing pgBouncer.").Default("postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable").Envar("PGBOUNCER_CONNECTION_STRING").String()
+		listenAddress           = kingpin.Flag("web.listen-address", "Address on which to expose metrics and web interface.").Default(":9127").Envar("PGBOUNCER_EXPORTER_WEB_LISTEN_ADDRESS").String()
+		metricsPath             = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").Envar("PGBOUNCER_EXPORTER_WEB_TELEMETRY_PATH").String()
+		pidFilePath             = kingpin.Flag("pgBouncer.pid-file", pidFileHelpText).Default("").Envar("PGBOUNCER_PID_FILE").String()
 	)
 
 	kingpin.Version(version.Print("pgbouncer_exporter"))
