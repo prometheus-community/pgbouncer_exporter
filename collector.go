@@ -108,7 +108,7 @@ var (
 
 	configMap = map[string]*(prometheus.Desc){
 		"max_client_conn": prometheus.NewDesc(
-			prometheus.BuildFQName(namespace, "config", "max_client_conn"),
+			prometheus.BuildFQName(namespace, "config", "max_client_connections"),
 			"Config maximum number of client connections", nil, nil),
 		"max_user_connections": prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "config", "max_user_connections"),
