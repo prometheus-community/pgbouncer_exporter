@@ -36,3 +36,11 @@ pools.sv_login | pgbouncer_pools_server_login_connections | Server connections c
 pools.maxwait | pgbouncer_pools_client_maxwait_seconds | Age of oldest unserved client connection, shown as second
 config.max_client_conn | pgbouncer_config_max_client_connections | Configured maximum number of client connections
 config.max_user_connections | pgbouncer_config_max_user_connections | Configured maximum number of server connections per user
+
+## TLS and basic authentication
+
+The pgbouncer exporter supports TLS and basic authentication.
+
+To use TLS and/or basic authentication, you need to pass a configuration file
+using the `--web.config.file` parameter. The format of the file is described
+[in the exporter-toolkit repository](https://github.com/prometheus/exporter-toolkit/blob/master/docs/web-configuration.md).
