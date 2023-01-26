@@ -8,7 +8,7 @@ executors:
   # This must match .promu.yml.
   golang:
     docker:
-      - image: quay.io/prometheus/golang-builder:1.18-base
+      - image: cimg/go:1.19
 
 jobs:
   test:
@@ -30,16 +30,28 @@ workflows:
               only: /.*/
       - prometheus/build:
           name: build
+          parallelism: 3
+          promu_opts: "-p linux/amd64 -p windows/amd64 -p linux/arm64 -p darwin/amd64 -p darwin/arm64 -p linux/386"
           filters:
             tags:
-              only: /.*/
+              ignore: /^v.*/
+            branches:
+              ignore: /^(main|master|release-.*|.*build-all.*)$/
+      - prometheus/build:
+          name: build_all
+          parallelism: 12
+          filters:
+            branches:
+              only: /^(main|master|release-.*|.*build-all.*)$/
+            tags:
+              only: /^v.*/
       - prometheus/publish_master:
           context: org-context
           docker_hub_organization: prometheuscommunity
           quay_io_organization: prometheuscommunity
           requires:
             - test
-            - build
+            - build_all
           filters:
             branches:
               only: master
@@ -49,7 +61,7 @@ workflows:
           quay_io_organization: prometheuscommunity
           requires:
             - test
-            - build
+            - build_all
           filters:
             tags:
               only: /^v.*/
