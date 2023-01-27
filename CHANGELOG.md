@@ -1,5 +1,10 @@
 ## master / unreleased
 
+## 0.6.0 / 2023-01-27
+
+* [FEATURE] Add config metrics #93
+* [FEATURE] Add TLS and Basic auth to the metrics endpoint #101
+
 ## 0.5.1 / 2022-10-03
 
 * No changes, just retagging due to a VERSION fix.
