@@ -180,14 +180,15 @@ func queryShowLists(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) 
 
 // Query SHOW CONFIG, which has a series of rows, not columns.
 func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) error {
-	rows, err := db.Query(fmt.Sprintln("SHOW CONFIG;"))
+	rows, err := db.Query("SHOW CONFIG;")
 	if err != nil {
 		return errors.New(fmt.Sprintln("error running SHOW CONFIG on database: ", err))
 	}
 	defer rows.Close()
 
 	columnNames, err := rows.Columns()
-	if err != nil || len(columnNames) != 3 {
+	numColumns := len(columnNames)
+	if err != nil {
 		return errors.New(fmt.Sprintln("error retrieving columns list from SHOW CONFIG: ", err))
 	}
 
@@ -198,10 +199,20 @@ func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger)
 
 	var key string
 	var values sql.RawBytes
+	var defaultValue sql.RawBytes
 	var changeable string
 	for rows.Next() {
-		if err = rows.Scan(&key, &values, &changeable); err != nil {
-			return errors.New(fmt.Sprintln("error retrieving SHOW CONFIG rows:", err))
+		switch numColumns {
+		case 3:
+			if err = rows.Scan(&key, &values, &changeable); err != nil {
+				return fmt.Errorf("error retrieving SHOW CONFIG rows: %w", err)
+			}
+		case 4:
+			if err = rows.Scan(&key, &values, &defaultValue, &changeable); err != nil {
+				return fmt.Errorf("error retrieving SHOW CONFIG rows: %w", err)
+			}
+		default:
+			return fmt.Errorf("invalid number of SHOW CONFIG  columns: %d", numColumns)
 		}
 
 		if !exposedConfig[key] {
