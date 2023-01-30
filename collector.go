@@ -150,24 +150,24 @@ func NewExporter(connectionString string, namespace string, logger log.Logger) *
 func queryShowLists(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) error {
 	rows, err := db.Query("SHOW LISTS;")
 	if err != nil {
-		return errors.New(fmt.Sprintln("error running SHOW LISTS on database: ", err))
+		return fmt.Errorf("error running SHOW LISTS on database: %w", err)
 	}
 	defer rows.Close()
 
 	columnNames, err := rows.Columns()
 	if err != nil || len(columnNames) != 2 {
-		return errors.New(fmt.Sprintln("error retrieving columns list from SHOW LISTS: ", err))
+		return fmt.Errorf("error retrieving columns list from SHOW LISTS: %w", err)
 	}
 
 	var list string
 	var items sql.RawBytes
 	for rows.Next() {
 		if err = rows.Scan(&list, &items); err != nil {
-			return errors.New(fmt.Sprintln("error retrieving SHOW LISTS rows:", err))
+			return fmt.Errorf("error retrieving SHOW LISTS rows: %w", err)
 		}
 		value, err := strconv.ParseFloat(string(items), 64)
 		if err != nil {
-			return errors.New(fmt.Sprintln("error parsing SHOW LISTS column: ", list, err))
+			return fmt.Errorf("error parsing SHOW LISTS column: %v, error: %w", list, err)
 		}
 		if metric, ok := listsMap[list]; ok {
 			ch <- prometheus.MustNewConstMetric(metric, prometheus.GaugeValue, value)
@@ -182,14 +182,14 @@ func queryShowLists(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) 
 func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) error {
 	rows, err := db.Query("SHOW CONFIG;")
 	if err != nil {
-		return errors.New(fmt.Sprintln("error running SHOW CONFIG on database: ", err))
+		return fmt.Errorf("error running SHOW CONFIG on database: %w", err)
 	}
 	defer rows.Close()
 
 	columnNames, err := rows.Columns()
 	numColumns := len(columnNames)
 	if err != nil {
-		return errors.New(fmt.Sprintln("error retrieving columns list from SHOW CONFIG: ", err))
+		return fmt.Errorf("error retrieving columns list from SHOW CONFIG: %w", err)
 	}
 
 	exposedConfig := make(map[string]bool)
@@ -221,7 +221,7 @@ func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger)
 
 		value, err := strconv.ParseFloat(string(values), 64)
 		if err != nil {
-			return errors.New(fmt.Sprintln("error parsing SHOW CONFIG column: ", key, err))
+			return fmt.Errorf("error parsing SHOW CONFIG column: %v, error: %w ", key, err)
 		}
 		if metric, ok := configMap[key]; ok {
 			ch <- prometheus.MustNewConstMetric(metric, prometheus.GaugeValue, value)
@@ -240,7 +240,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	// Don't fail on a bad scrape of one metric
 	rows, err := db.Query(query)
 	if err != nil {
-		return []error{}, errors.New(fmt.Sprintln("error running query on database: ", namespace, err))
+		return []error{}, fmt.Errorf("error running query on database: %v, error: %w", namespace, err)
 	}
 
 	defer rows.Close()
@@ -248,7 +248,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	var columnNames []string
 	columnNames, err = rows.Columns()
 	if err != nil {
-		return []error{}, errors.New(fmt.Sprintln("error retrieving column list for: ", namespace, err))
+		return []error{}, fmt.Errorf("error retrieving column list for: %v, error: %w", namespace, err)
 	}
 
 	// Make a lookup map for the column indices
@@ -269,7 +269,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 		labelValues := make([]string, len(mapping.labels))
 		err = rows.Scan(scanArgs...)
 		if err != nil {
-			return []error{}, errors.New(fmt.Sprintln("error retrieving rows:", namespace, err))
+			return []error{}, fmt.Errorf("error retrieving rows: %v, error: %w", namespace, err)
 		}
 
 		for i, label := range mapping.labels {
@@ -314,7 +314,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 
 				value, ok := metricMapping.conversion(columnData[idx])
 				if !ok {
-					nonfatalErrors = append(nonfatalErrors, errors.New(fmt.Sprintln("unexpected error parsing column: ", namespace, columnName, columnData[idx])))
+					nonfatalErrors = append(nonfatalErrors, fmt.Errorf("unexpected error parsing namespace: %v, column: %v, index: %v", namespace, columnName, columnData[idx]))
 					continue
 				}
 				// Generate the metric
@@ -324,7 +324,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	}
 	if err := rows.Err(); err != nil {
 		level.Error(logger).Log("msg", "Failed scaning all rows", "err", err)
-		nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Failed to consume all rows due to: %s", err))
+		nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Failed to consume all rows due to: %w", err))
 	}
 	return nonfatalErrors, nil
 }
@@ -336,7 +336,7 @@ func getDB(conn string) (*sql.DB, error) {
 	}
 	rows, err := db.Query("SHOW STATS")
 	if err != nil {
-		return nil, fmt.Errorf("error pinging pgbouncer: %q", err)
+		return nil, fmt.Errorf("error pinging pgbouncer: %w", err)
 	}
 	defer rows.Close()
 
@@ -405,14 +405,14 @@ func queryNamespaceMappings(ch chan<- prometheus.Metric, db *sql.DB, metricMap m
 func queryVersion(ch chan<- prometheus.Metric, db *sql.DB) error {
 	rows, err := db.Query("SHOW VERSION;")
 	if err != nil {
-		return fmt.Errorf("error getting pgbouncer version: %v", err)
+		return fmt.Errorf("error getting pgbouncer version: %w", err)
 	}
 	defer rows.Close()
 
 	var columnNames []string
 	columnNames, err = rows.Columns()
 	if err != nil {
-		return fmt.Errorf("error retrieving column list for version: %v", err)
+		return fmt.Errorf("error retrieving column list for version: %w", err)
 	}
 	if len(columnNames) != 1 || columnNames[0] != "version" {
 		return errors.New("show version didn't return version column")
