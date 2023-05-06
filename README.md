@@ -13,6 +13,12 @@ To see all available configuration flags:
 
     ./pgbouncer_exporter -h
 
+## Run with docker
+
+```
+docker run prometheuscommunity/pgbouncer-exporter <flags>
+```
+
 
 ## Metrics
 
