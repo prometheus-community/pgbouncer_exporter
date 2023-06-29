@@ -13,12 +13,17 @@ To see all available configuration flags:
 
     ./pgbouncer_exporter -h
 
+## PGBouncer configuration
+
+The pgbouncer\_exporter requires a configuration change to pgbouncer to ignore a PostgreSQL driver connection parameter. In the `pgbouncer.ini` please include this option:
+
+    ignore_startup_parameters = extra_float_digits
+
 ## Run with docker
 
 ```
 docker run prometheuscommunity/pgbouncer-exporter <flags>
 ```
-
 
 ## Metrics
 
