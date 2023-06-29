@@ -14,10 +14,10 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 
+	"github.com/alecthomas/kingpin/v2"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -27,24 +27,9 @@ import (
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
-const (
-	namespace = "pgbouncer"
-	indexHTML = `
-	<html>
-		<head>
-			<title>PgBouncer Exporter</title>
-		</head>
-		<body>
-			<h1>PgBouncer Exporter</h1>
-			<p>
-			<a href='%s'>Metrics</a>
-			</p>
-		</body>
-	</html>`
-)
+const namespace = "pgbouncer"
 
 func main() {
 	const pidFileHelpText = `Path to PgBouncer pid file.
@@ -92,9 +77,25 @@ func main() {
 	}
 
 	http.Handle(*metricsPath, promhttp.Handler())
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(fmt.Sprintf(indexHTML, *metricsPath)))
-	})
+	if *metricsPath != "/" && *metricsPath != "" {
+		landingConfig := web.LandingConfig{
+			Name:        "PgBouncer Exporter",
+			Description: "Prometheus Exporter for PgBouncer servers",
+			Version:     version.Info(),
+			Links: []web.LandingLinks{
+				{
+					Address: *metricsPath,
+					Text:    "Metrics",
+				},
+			},
+		}
+		landingPage, err := web.NewLandingPage(landingConfig)
+		if err != nil {
+			level.Error(logger).Log("err", err)
+			os.Exit(1)
+		}
+		http.Handle("/", landingPage)
+	}
 
 	srv := &http.Server{}
 	if err := web.ListenAndServe(srv, toolkitFlags, logger); err != nil {

@@ -19,6 +19,12 @@ The pgbouncer\_exporter requires a configuration change to pgbouncer to ignore a
 
     ignore_startup_parameters = extra_float_digits
 
+## Run with docker
+
+```
+docker run prometheuscommunity/pgbouncer-exporter <flags>
+```
+
 ## Metrics
 
 |PgBouncer column|Prometheus Metric|Description|
