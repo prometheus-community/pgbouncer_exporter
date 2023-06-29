@@ -1,5 +1,10 @@
 ## master / unreleased
 
+## 0.7.0 / 2023-06-29
+
+* [CHANGE] Require Go 1.19 and update CI with Go 1.20 #120
+* [CHANGE] Synchronize common files from prometheus/prometheus #123
+
 ## 0.6.0 / 2023-01-27
 
 * [FEATURE] Add config metrics #93
