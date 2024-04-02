@@ -21,6 +21,7 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
+	versioncollector "github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/common/promlog"
 	"github.com/prometheus/common/promlog/flag"
@@ -61,7 +62,7 @@ func main() {
 	connectionString := *connectionStringPointer
 	exporter := NewExporter(connectionString, namespace, logger)
 	prometheus.MustRegister(exporter)
-	prometheus.MustRegister(version.NewCollector("pgbouncer_exporter"))
+	prometheus.MustRegister(versioncollector.NewCollector("pgbouncer_exporter"))
 
 	level.Info(logger).Log("msg", "Starting pgbouncer_exporter", "version", version.Info())
 	level.Info(logger).Log("msg", "Build context", "build_context", version.BuildContext())
