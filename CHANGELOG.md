@@ -1,5 +1,9 @@
 ## master / unreleased
 
+## 0.8.0 / 2024-04-02
+
+* [ENHANCEMENT] Publish server/client cancel statistics. #1144
+
 ## 0.7.0 / 2023-06-29
 
 * [CHANGE] Require Go 1.19 and update CI with Go 1.20 #120
