@@ -1,5 +1,9 @@
 ## master / unreleased
 
+## 0.9.0 / 2024-08-01
+
+* [FEATURE] Allow connection config via environment variable #159
+
 ## 0.8.0 / 2024-04-02
 
 * [ENHANCEMENT] Publish server/client cancel statistics. #1144
