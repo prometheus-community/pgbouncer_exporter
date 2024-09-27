@@ -17,14 +17,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"os"
 	"strconv"
 	"time"
 	"unicode/utf8"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -134,12 +133,12 @@ var (
 	)
 )
 
-func NewExporter(connectionString string, namespace string, logger log.Logger) *Exporter {
+func NewExporter(connectionString string, namespace string, logger *slog.Logger) *Exporter {
 
 	db, err := getDB(connectionString)
 
 	if err != nil {
-		level.Error(logger).Log("msg", "error setting up DB connection", "err", err)
+		logger.Error("error setting up DB connection", "err", err.Error())
 		os.Exit(1)
 	}
 
@@ -151,7 +150,7 @@ func NewExporter(connectionString string, namespace string, logger log.Logger) *
 }
 
 // Query SHOW LISTS, which has a series of rows, not columns.
-func queryShowLists(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) error {
+func queryShowLists(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logger) error {
 	rows, err := db.Query("SHOW LISTS;")
 	if err != nil {
 		return fmt.Errorf("error running SHOW LISTS on database: %w", err)
@@ -176,14 +175,14 @@ func queryShowLists(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) 
 		if metric, ok := listsMap[list]; ok {
 			ch <- prometheus.MustNewConstMetric(metric, prometheus.GaugeValue, value)
 		} else {
-			level.Debug(logger).Log("msg", "SHOW LISTS unknown list", "list", list)
+			logger.Debug("SHOW LISTS unknown list", "list", list)
 		}
 	}
 	return nil
 }
 
 // Query SHOW CONFIG, which has a series of rows, not columns.
-func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger) error {
+func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logger) error {
 	rows, err := db.Query("SHOW CONFIG;")
 	if err != nil {
 		return fmt.Errorf("error running SHOW CONFIG on database: %w", err)
@@ -230,7 +229,7 @@ func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger)
 		if metric, ok := configMap[key]; ok {
 			ch <- prometheus.MustNewConstMetric(metric, prometheus.GaugeValue, value)
 		} else {
-			level.Debug(logger).Log("msg", "SHOW CONFIG unknown config", "config", key)
+			logger.Debug("SHOW CONFIG unknown config", "config", key)
 		}
 	}
 	return nil
@@ -238,7 +237,7 @@ func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger log.Logger)
 
 // Query within a namespace mapping and emit metrics. Returns fatal errors if
 // the scrape fails, and a slice of errors if they were non-fatal.
-func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace string, mapping MetricMapNamespace, logger log.Logger) ([]error, error) {
+func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace string, mapping MetricMapNamespace, logger *slog.Logger) ([]error, error) {
 	query := fmt.Sprintf("SHOW %s;", namespace)
 
 	// Don't fail on a bad scrape of one metric
@@ -327,7 +326,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 		}
 	}
 	if err := rows.Err(); err != nil {
-		level.Error(logger).Log("msg", "Failed scaning all rows", "err", err)
+		logger.Error("Failed scaning all rows", "err", err.Error())
 		nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Failed to consume all rows due to: %w", err))
 	}
 	return nonfatalErrors, nil
@@ -382,22 +381,22 @@ func dbToFloat64(t interface{}, factor float64) (float64, bool) {
 }
 
 // Iterate through all the namespace mappings in the exporter and run their queries.
-func queryNamespaceMappings(ch chan<- prometheus.Metric, db *sql.DB, metricMap map[string]MetricMapNamespace, logger log.Logger) map[string]error {
+func queryNamespaceMappings(ch chan<- prometheus.Metric, db *sql.DB, metricMap map[string]MetricMapNamespace, logger *slog.Logger) map[string]error {
 	// Return a map of namespace -> errors
 	namespaceErrors := make(map[string]error)
 
 	for namespace, mapping := range metricMap {
-		level.Debug(logger).Log("msg", "Querying namespace", "namespace", namespace)
+		logger.Debug("Querying namespace", "namespace", namespace)
 		nonFatalErrors, err := queryNamespaceMapping(ch, db, namespace, mapping, logger)
-		// Serious error - a namespace disappeard
+		// Serious error - a namespace disappeared
 		if err != nil {
 			namespaceErrors[namespace] = err
-			level.Info(logger).Log("msg", "namespace disappeard", "err", err)
+			logger.Info("namespace disappeared", "err", err.Error())
 		}
 		// Non-serious errors - likely version or parsing problems.
 		if len(nonFatalErrors) > 0 {
 			for _, err := range nonFatalErrors {
-				level.Info(logger).Log("msg", "error parsing", "err", err.Error())
+				logger.Info("error parsing", "err", err.Error())
 			}
 		}
 	}
@@ -470,29 +469,29 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	level.Info(e.logger).Log("msg", "Starting scrape")
+	e.logger.Error("Starting scrape")
 
-	var up float64 = 1.0
+	var up = 1.0
 
 	err := queryVersion(ch, e.db)
 	if err != nil {
-		level.Error(e.logger).Log("msg", "error getting version", "err", err)
+		e.logger.Error("error getting version", "err", err.Error())
 		up = 0
 	}
 
 	if err = queryShowLists(ch, e.db, e.logger); err != nil {
-		level.Error(e.logger).Log("msg", "error getting SHOW LISTS", "err", err)
+		e.logger.Error("error getting SHOW LISTS", "err", err.Error())
 		up = 0
 	}
 
 	if err = queryShowConfig(ch, e.db, e.logger); err != nil {
-		level.Error(e.logger).Log("msg", "error getting SHOW CONFIG", "err", err)
+		e.logger.Error("error getting SHOW CONFIG", "err", err.Error())
 		up = 0
 	}
 
 	errMap := queryNamespaceMappings(ch, e.db, e.metricMap, e.logger)
 	if len(errMap) > 0 {
-		level.Error(e.logger).Log("msg", "error querying namespace mappings", "err", errMap)
+		e.logger.Error("error querying namespace mappings", "err", errMap)
 		up = 0
 	}
 
@@ -503,7 +502,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 }
 
 // Turn the MetricMap column mapping into a prometheus descriptor mapping.
-func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace string, logger log.Logger) map[string]MetricMapNamespace {
+func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace string, logger *slog.Logger) map[string]MetricMapNamespace {
 	var metricMap = make(map[string]MetricMapNamespace)
 
 	for metricNamespace, mappings := range metricMaps {
@@ -513,7 +512,7 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 		// First collect all the labels since the metrics will need them
 		for columnName, columnMapping := range mappings {
 			if columnMapping.usage == LABEL {
-				level.Debug(logger).Log("msg", "Adding label", "column_name", columnName, "metric_namespace", metricNamespace)
+				logger.Debug("Adding label", "column_name", columnName, "metric_namespace", metricNamespace)
 				labels = append(labels, columnName)
 			}
 		}

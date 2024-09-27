@@ -18,13 +18,12 @@ import (
 	"os"
 
 	"github.com/alecthomas/kingpin/v2"
-	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	versioncollector "github.com/prometheus/client_golang/prometheus/collectors/version"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
-	"github.com/prometheus/common/promlog/flag"
+	"github.com/prometheus/common/promslog"
+	"github.com/prometheus/common/promslog/flag"
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
@@ -42,8 +41,8 @@ func main() {
 
 	https://prometheus.io/docs/instrumenting/writing_clientlibs/#process-metrics.`
 
-	promlogConfig := &promlog.Config{}
-	flag.AddFlags(kingpin.CommandLine, promlogConfig)
+	promslogConfig := &promslog.Config{}
+	flag.AddFlags(kingpin.CommandLine, promslogConfig)
 
 	var (
 		connectionStringPointer = kingpin.Flag("pgBouncer.connectionString", "Connection string for accessing pgBouncer.").Default("postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable").Envar("PGBOUNCER_EXPORTER_CONNECTION_STRING").String()
@@ -57,15 +56,15 @@ func main() {
 	kingpin.HelpFlag.Short('h')
 	kingpin.Parse()
 
-	logger := promlog.New(promlogConfig)
+	logger := promslog.New(promslogConfig)
 
 	connectionString := *connectionStringPointer
 	exporter := NewExporter(connectionString, namespace, logger)
 	prometheus.MustRegister(exporter)
 	prometheus.MustRegister(versioncollector.NewCollector("pgbouncer_exporter"))
 
-	level.Info(logger).Log("msg", "Starting pgbouncer_exporter", "version", version.Info())
-	level.Info(logger).Log("msg", "Build context", "build_context", version.BuildContext())
+	logger.Info("Starting pgbouncer_exporter", "version", version.Info())
+	logger.Info("Build context", "build_context", version.BuildContext())
 
 	if *pidFilePath != "" {
 		procExporter := collectors.NewProcessCollector(
@@ -92,7 +91,7 @@ func main() {
 		}
 		landingPage, err := web.NewLandingPage(landingConfig)
 		if err != nil {
-			level.Error(logger).Log("err", err)
+			logger.Error("Error creating landing page", "err", err)
 			os.Exit(1)
 		}
 		http.Handle("/", landingPage)
@@ -100,7 +99,7 @@ func main() {
 
 	srv := &http.Server{}
 	if err := web.ListenAndServe(srv, toolkitFlags, logger); err != nil {
-		level.Error(logger).Log("err", err)
+		logger.Error("Error starting server", "err", err)
 		os.Exit(1)
 	}
 }
