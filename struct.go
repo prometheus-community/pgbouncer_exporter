@@ -17,8 +17,8 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 
-	"github.com/go-kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -53,7 +53,7 @@ func stringTocolumnUsage(s string) (u columnUsage, err error) {
 }
 
 // Implements the yaml.Unmarshaller interface
-func (this *columnUsage) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (cu *columnUsage) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	var value string
 	if err := unmarshal(&value); err != nil {
 		return err
@@ -64,7 +64,7 @@ func (this *columnUsage) UnmarshalYAML(unmarshal func(interface{}) error) error 
 		return err
 	}
 
-	*this = columnUsage
+	*cu = columnUsage
 	return nil
 }
 
@@ -106,5 +106,5 @@ type Exporter struct {
 
 	db *sql.DB
 
-	logger log.Logger
+	logger *slog.Logger
 }
