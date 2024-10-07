@@ -110,6 +110,9 @@ var (
 	}
 
 	configMap = map[string]*(prometheus.Desc){
+		"auth_type": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "config", "auth_type"),
+			"Config authentication type used by pgbouncer", nil, nil),
 		"max_client_conn": prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "config", "max_client_connections"),
 			"Config maximum number of client connections", nil, nil),
