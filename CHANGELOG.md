@@ -1,5 +1,10 @@
 ## master / unreleased
 
+## 0.10.0 / 2024-10-07
+
+* [CHANGE] Switch logging to slog #167
+* [ENHANCEMENT] Add auth_type to config collector #169
+
 ## 0.9.0 / 2024-08-01
 
 * [FEATURE] Allow connection config via environment variable #159
