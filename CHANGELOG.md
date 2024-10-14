@@ -1,5 +1,9 @@
 ## master / unreleased
 
+## 0.10.1 / 2024-10-14
+
+* [BUGFIX] Revert auth_type guage #173
+
 ## 0.10.0 / 2024-10-07
 
 * [CHANGE] Switch logging to slog #167
