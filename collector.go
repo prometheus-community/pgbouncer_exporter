@@ -469,7 +469,7 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	e.logger.Error("Starting scrape")
+	e.logger.Info("Starting scrape")
 
 	var up = 1.0
 
