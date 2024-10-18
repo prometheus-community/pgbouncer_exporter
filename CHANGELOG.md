@@ -1,5 +1,9 @@
 ## master / unreleased
 
+## 0.10.2 / 2024-10-18
+
+* [BUGFIX] Fix wrong logging level of "Starting scrape" message #175
+
 ## 0.10.1 / 2024-10-14
 
 * [BUGFIX] Revert auth_type guage #173
