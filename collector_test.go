@@ -17,6 +17,7 @@ import (
 	"log/slog"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/smartystreets/goconvey/convey"
@@ -63,7 +64,7 @@ func TestQueryShowList(t *testing.T) {
 		AddRow("users", 2)
 
 	mock.ExpectQuery("SHOW LISTS;").WillReturnRows(rows)
-	logger := &slog.Logger{}
+	logger := slog.Default()
 
 	ch := make(chan prometheus.Metric)
 	go func() {
@@ -105,7 +106,7 @@ func TestQueryShowConfig(t *testing.T) {
 		AddRow("client_tls_ciphers", "default", "default", "yes")
 
 	mock.ExpectQuery("SHOW CONFIG;").WillReturnRows(rows)
-	logger := &slog.Logger{}
+	logger := slog.Default()
 
 	ch := make(chan prometheus.Metric)
 	go func() {
@@ -128,4 +129,112 @@ func TestQueryShowConfig(t *testing.T) {
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled exceptions: %s", err)
 	}
+}
+
+func TestQueryVersion(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Error opening a stub db connection: %s", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"version"}).
+		AddRow("PgBouncer 1.23.1")
+
+	mock.ExpectQuery("SHOW VERSION;").WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		err := queryVersion(ch, db)
+		if err != nil {
+			t.Errorf("Error running queryShowConfig: %s", err)
+		}
+	}()
+
+	expected := []MetricResult{
+		{labels: labelMap{"version": "PgBouncer 1.23.1"}, metricType: dto.MetricType_GAUGE, value: 1},
+	}
+
+	convey.Convey("Metrics comparison", t, func() {
+		for _, expect := range expected {
+			m := readMetric(<-ch)
+			convey.So(expect, convey.ShouldResemble, m)
+		}
+	})
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled exceptions: %s", err)
+	}
+}
+
+func TestBadQueryVersion(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Error opening a stub db connection: %s", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"version"}).
+		AddRow("PgBouncer x.x.x")
+
+	mock.ExpectQuery("SHOW VERSION;").WillReturnRows(rows)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		err := queryVersion(ch, db)
+		if err != nil {
+			t.Errorf("Error running queryShowConfig: %s", err)
+		}
+	}()
+
+	expected := []MetricResult{
+		{labels: labelMap{"version": "PgBouncer x.x.x"}, metricType: dto.MetricType_GAUGE, value: 1},
+	}
+
+	convey.Convey("Metrics comparison", t, func() {
+		for _, expect := range expected {
+			m := readMetric(<-ch)
+			convey.So(expect, convey.ShouldResemble, m)
+		}
+	})
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled exceptions: %s", err)
+	}
+}
+
+func TestMakeDescMap(t *testing.T) {
+	currentVersion := semver.MustParse("1.20.1")
+	metricMap := map[string]ColumnMapping{
+		"name":                {LABEL, "N/A", 1, "N/A", semver.Version{}},
+		"host":                {LABEL, "N/A", 1, "N/A", semver.MustParse("1.21.0")},
+		"port":                {LABEL, "N/A", 1, "N/A", semver.MustParse("1.9.0")},
+		"pool_size":           {GAUGE, "pool_size", 1, "Maximum number of server connections", semver.MustParse("1.22.0")},
+		"reserve_pool":        {GAUGE, "reserve_pool", 1, "Maximum number of additional connections for this database", semver.Version{}},
+		"current_connections": {GAUGE, "current_connections", 1e-6, "Current number of connections for this database", semver.MustParse("1.7.0")},
+		"total_query_count":   {COUNTER, "queries_pooled_total", 1, "Total number of SQL queries pooled", semver.Version{}},
+	}
+	metricMaps := map[string]map[string]ColumnMapping{
+		"database": metricMap,
+	}
+	logger := slog.Default()
+
+	convey.Convey("Test makeDescMap", t, func() {
+		descMap := makeDescMap(metricMaps, "foo", logger, currentVersion)
+
+		convey.So(descMap, convey.ShouldContainKey, "database")
+		convey.So(descMap, convey.ShouldHaveLength, 1)
+
+		convey.So(descMap["database"].labels, convey.ShouldHaveLength, 2)
+		convey.So(descMap["database"].labels, convey.ShouldContain, "name")
+		convey.So(descMap["database"].labels, convey.ShouldContain, "port")
+
+		convey.So(descMap["database"].columnMappings, convey.ShouldHaveLength, 3)
+		convey.So(descMap["database"].columnMappings, convey.ShouldContainKey, "reserve_pool")
+		convey.So(descMap["database"].columnMappings["reserve_pool"].vtype, convey.ShouldEqual, prometheus.GaugeValue)
+		convey.So(descMap["database"].columnMappings, convey.ShouldContainKey, "current_connections")
+		convey.So(descMap["database"].columnMappings["current_connections"].vtype, convey.ShouldEqual, prometheus.GaugeValue)
+		convey.So(descMap["database"].columnMappings, convey.ShouldContainKey, "total_query_count")
+		convey.So(descMap["database"].columnMappings["total_query_count"].vtype, convey.ShouldEqual, prometheus.CounterValue)
+	})
 }

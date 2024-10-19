@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/blang/semver/v4"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -93,10 +94,11 @@ type MetricMap struct {
 }
 
 type ColumnMapping struct {
-	usage       columnUsage `yaml:"usage"`
-	metric      string      `yaml:"metric"`
-	factor      float64     `yaml:"factor"`
-	description string      `yaml:"description"`
+	usage       columnUsage    `yaml:"usage"`
+	metric      string         `yaml:"metric"`
+	factor      float64        `yaml:"factor"`
+	description string         `yaml:"description"`
+	minVersion  semver.Version `yaml:"min_version"`
 }
 
 // Exporter collects PgBouncer stats from the given server and exports
@@ -107,4 +109,6 @@ type Exporter struct {
 	db *sql.DB
 
 	logger *slog.Logger
+
+	version semver.Version
 }
