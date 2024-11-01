@@ -133,9 +133,16 @@ var (
 	)
 )
 
-func NewExporter(connectionString string, namespace string, logger *slog.Logger) *Exporter {
+func NewExporter(connectionString string, namespace string, logger *slog.Logger, mustConnect bool) *Exporter {
 
-	db, err := getDB(connectionString)
+	var db *sql.DB
+	var err error
+
+	if mustConnect {
+		db, err = getDBWithTest(connectionString)
+	} else {
+		db, err = getDB(connectionString)
+	}
 
 	if err != nil {
 		logger.Error("error setting up DB connection", "err", err.Error())
@@ -337,15 +344,22 @@ func getDB(conn string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
+	return db, nil
+}
+func getDBWithTest(conn string) (*sql.DB, error) {
+	db, err := getDB(conn)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := db.Query("SHOW STATS")
 	if err != nil {
 		return nil, fmt.Errorf("error pinging pgbouncer: %w", err)
 	}
 	defer rows.Close()
-
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
-
 	return db, nil
 }
 

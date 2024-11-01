@@ -9,9 +9,20 @@ Exports metrics at `9127/metrics`
     make build
     ./pgbouncer_exporter <flags>
 
+## Exporter configuration
+
+### Command line flags
 To see all available configuration flags:
 
     ./pgbouncer_exporter -h
+
+### Export multiple PGBouncer instances
+
+If you want to export metrics for multiple PGBouncer instances without running multiple exporters you can use the config.file option
+
+    ./pgbouncer_exporter --config.file config.yaml
+
+For more information about the possibilities and requirements see [the example config.yaml file within this repo](config.yaml) 
 
 ## PGBouncer configuration
 

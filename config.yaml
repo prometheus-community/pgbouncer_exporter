@@ -1,0 +1,33 @@
+## must_connect_on_startup: true|false; Default: true
+## If true the exporter will fail to start if any connection fails to connect within the startup fase.
+## If false the exporter will start even if some connections fail.
+must_connect_on_startup: false
+
+## extra_labels: map of label:value; Default: empty
+## These common extra labels will be set on all metrics for all connections. The value can be overridden per connection
+## Note: Every connection MUST have the same set of labels but a unique set of values.
+extra_labels:
+  environment: test
+
+## metrics_path: /path/for/metrics; Default: /metrics
+metrics_path: /metrics
+
+## All the PGBouncers to scrape,
+## when multiple connections are used, extra_labels is required to give every connection a unique set of label values
+pgbouncers:
+  - dsn: postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable    # Connection string for the pgbouncer instance (Required)
+    pid-file: /path/to/pidfile                                            # Add path to pgbouncer pid file to enable the process exporter metrics, Default: empty
+    extra_labels:                                                         # Extra labels to identify the metrics for each instance. As mentioned
+      pgbouncer_instance: set1-0                                          # Example: a unique identifier for each pgbouncer instance.
+      environment: prod                                                   # Example: a shared label for multiple pgbouncer instances
+  - dsn: postgres://postgres:@localhost:6544/pgbouncer?sslmode=disable
+    pid-file:
+    extra_labels:
+      pgbouncer_instance: set1-1
+      environment: prod
+  - dsn: postgres://postgres:@localhost:6545/pgbouncer?sslmode=disable
+    pid-file:
+    extra_labels:
+      pgbouncer_instance: set2-0
+      ## the metrics of this instance will have the additional labels: {environment: "test", pgbouncer_instance: "set2-0"}
+      ## as `environment: "test"` is inherited from common extra_labels

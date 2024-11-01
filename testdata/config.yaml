@@ -1,0 +1,17 @@
+must_connect_on_startup: false
+extra_labels:
+  environment: sandbox
+
+metrics_path: /prom
+
+pgbouncers:
+  - dsn: postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable
+    pid-file: /var/run/pgbouncer1.pid
+    extra_labels:
+      pgbouncer_instance: set1-0
+      environment: prod
+  - dsn: postgres://postgres:@localhost:6544/pgbouncer?sslmode=disable
+    pid-file: /var/run/pgbouncer2.pid
+    extra_labels:
+      pgbouncer_instance: set1-1
+      environment: prod
