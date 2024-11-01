@@ -1,0 +1,6 @@
+# yamllint disable-file
+# This file is invalid on purpose and should throw errors
+must_connect_on_startup: false
+extra_labels:
+  environment: sandbox
+    - trigger: parse_error #syntax error: mapping values are not allowed here (syntax)

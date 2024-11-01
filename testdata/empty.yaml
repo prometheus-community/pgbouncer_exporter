@@ -1,0 +1,7 @@
+must_connect_on_startup: false
+extra_labels:
+  environment: sandbox
+
+metrics_path: /prom
+
+pgbouncers:
