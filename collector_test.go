@@ -144,22 +144,23 @@ func TestQueryShowDatabases(t *testing.T) {
 func TestQueryShowStats(t *testing.T) {
 	// columns are listed in the order PgBouncers exposes them, a value of -1 means pgbouncer_exporter does not expose this value as a metric
 	rows := sqlmock.NewRows([]string{"database",
-		"total_xact_count", "total_query_count", "total_server_assignment_count", "total_received", "total_sent",
-		"total_xact_time", "total_query_time", "total_wait_time", "total_client_parse_count", "total_server_parse_count", "total_bind_count"}).
-		AddRow("pg0", 10, 40, -1, 220, 460, 6, 8, 9, 5, 55, 555)
+		"server_assignment_count",
+		"xact_count", "query_count", "bytes_received", "bytes_sent",
+		"xact_time", "query_time", "wait_time", "client_parse_count", "server_parse_count", "bind_count"}).
+		AddRow("pg0", -1, 10, 40, 220, 460, 6, 8, 9, 5, 55, 555)
 
 	// expected metrics are returned in the same order as the colums
 	expected := []MetricResult{
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 10},   // total_xact_count
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 40},   // total_query_count
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 220},  // total_received
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 460},  // total_sent
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 6e-6}, // total_xact_time
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 8e-6}, // total_query_time
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 9e-6}, // total_wait_time
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 5},    // total_client_parse_count
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 55},   // total_server_parse_count
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 555},  // total_bind_count
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 10},   // xact_count
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 40},   // query_count
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 220},  // bytes_received
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 460},  // bytes_sent
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 6e-6}, // xact_time
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 8e-6}, // query_time
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 9e-6}, // wait_time
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 5},    // client_parse_count
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 55},   // server_parse_count
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 555},  // bind_count
 	}
 
 	testQueryNamespaceMapping(t, "stats_totals", rows, expected)
