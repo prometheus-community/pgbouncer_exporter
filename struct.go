@@ -107,4 +107,6 @@ type Exporter struct {
 	db *sql.DB
 
 	logger *slog.Logger
+
+	filterEmptyPools bool
 }
