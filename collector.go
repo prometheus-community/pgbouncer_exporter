@@ -21,14 +21,17 @@ import (
 	"math"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
 
+	"github.com/alecthomas/kingpin/v2"
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
+	showConfig = kingpin.Flag("showconfig", "Export PgBouncer configuration metrics").Default("false").Bool()
 	metricMaps = map[string]map[string]ColumnMapping{
 		"databases": {
 			"name":                {LABEL, "N/A", 1, "N/A"},
@@ -70,6 +73,12 @@ var (
 			"sv_tested":             {GAUGE, "server_testing_connections", 1, "Server connections currently running either server_reset_query or server_check_query, shown as connection"},
 			"sv_login":              {GAUGE, "server_login_connections", 1, "Server connections currently in the process of logging in, shown as connection"},
 			"maxwait":               {GAUGE, "client_maxwait_seconds", 1, "Age of oldest unserved client connection, shown as second"},
+		},
+		"clients": {
+			"user":         {LABEL, "N/A", 1, "N/A"},
+			"database":     {LABEL, "N/A", 1, "N/A"},
+			"state":        {LABEL, "N/A", 1, "N/A"},
+			"storage_user": {LABEL, "N/A", 1, "N/A"},
 		},
 	}
 
@@ -183,6 +192,9 @@ func queryShowLists(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logger
 
 // Query SHOW CONFIG, which has a series of rows, not columns.
 func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logger) error {
+	if !*showConfig {
+		return nil
+	}
 	rows, err := db.Query("SHOW CONFIG;")
 	if err != nil {
 		return fmt.Errorf("error running SHOW CONFIG on database: %w", err)
@@ -232,6 +244,54 @@ func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logge
 			logger.Debug("SHOW CONFIG unknown config", "config", key)
 		}
 	}
+	return nil
+}
+
+// Query SHOW CLIENTS
+func queryShowClients(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logger) error {
+	rows, err := db.Query("SHOW CLIENTS;")
+	if err != nil {
+		logger.Error("error running SHOW CLIENTS on database", "err", err)
+		return fmt.Errorf("error running SHOW CLIENTS on database: %w", err)
+	}
+	defer rows.Close()
+
+	clientCounts := make(map[string]int)
+
+	for rows.Next() {
+		var typ, user, database, state, storageUser, addr, localAddr string
+		var port, localPort, wait, waitUs, coro, remotePid int
+		var id, ptr string
+		var connectTime, requestTime, tls interface{}
+
+		err := rows.Scan(&typ, &user, &database, &state, &storageUser,
+			&addr, &port, &localAddr, &localPort, &connectTime, &requestTime,
+			&wait, &waitUs, &id, &ptr, &coro, &remotePid, &tls)
+		if err != nil {
+			return fmt.Errorf("error scanning client row: %w", err)
+		}
+
+		key := fmt.Sprintf("%s:%s:%s:%s", user, database, state, storageUser)
+		clientCounts[key]++
+	}
+
+	desc := prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "", "clients"),
+		"Number of clients grouped by labels",
+		[]string{"user", "database", "state", "storage_user"},
+		nil,
+	)
+
+	for key, count := range clientCounts {
+		labels := strings.Split(key, ":")
+		ch <- prometheus.MustNewConstMetric(
+			desc,
+			prometheus.GaugeValue,
+			float64(count),
+			labels...,
+		)
+	}
+
 	return nil
 }
 
@@ -327,7 +387,7 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	}
 	if err := rows.Err(); err != nil {
 		logger.Error("Failed scaning all rows", "err", err.Error())
-		nonfatalErrors = append(nonfatalErrors, fmt.Errorf("Failed to consume all rows due to: %w", err))
+		nonfatalErrors = append(nonfatalErrors, fmt.Errorf("failed to consume all rows due to: %w", err))
 	}
 	return nonfatalErrors, nil
 }
@@ -486,6 +546,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	if err = queryShowConfig(ch, e.db, e.logger); err != nil {
 		e.logger.Error("error getting SHOW CONFIG", "err", err.Error())
+		up = 0
+	}
+
+	if err = queryShowClients(ch, e.db, e.logger); err != nil {
+		e.logger.Error("error getting SHOW CLIENTS", "err", err.Error())
 		up = 0
 	}
 
