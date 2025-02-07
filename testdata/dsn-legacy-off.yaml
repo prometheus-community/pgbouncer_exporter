@@ -1,0 +1,4 @@
+legacy_mode: false
+dsn: postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable
+must_connect_on_startup: true
+

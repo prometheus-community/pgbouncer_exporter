@@ -17,117 +17,119 @@ import (
 	"errors"
 	"fmt"
 	"gopkg.in/yaml.v3"
-	"maps"
 	"os"
-	"slices"
-	"strings"
 )
 
 var (
-	ErrNoPgbouncersConfigured = errors.New("no pgbouncer instances configured")
-	ErrEmptyPgbouncersDSN     = errors.New("atleast one pgbouncer instance has an empty dsn configured")
+	ErrorNoConfigFileGiven = errors.New("File path cannot be an empty string")
+	ErrorUsernameRequired  = errors.New("username is required")
 )
 
-func NewDefaultConfig() *Config {
-	return &Config{
-		MustConnectOnStartup: true,
-		ExtraLabels:          map[string]string{},
-		MetricsPath:          "/metrics",
-		PgBouncers:           []PgBouncerConfig{},
+func index2human(index int) string {
+
+	// Reduce value to last digit, with the exception for 11th,12th and 13th.
+	// 22 => 2 => 22nd
+	selector := index
+	if index >= 14 {
+		selector = index % 10
+	}
+
+	switch selector {
+	case 1:
+		return fmt.Sprintf("%dst", index)
+	case 2:
+		return fmt.Sprintf("%dnd", index)
+	case 3:
+		return fmt.Sprintf("%drd", index)
+	default:
+		return fmt.Sprintf("%dth", index)
 	}
 }
 
-func NewConfigFromFile(path string) (*Config, error) {
+type DuplicateCredentialsKeyError struct {
+	message string
+	index   int
+	first   int
+}
+
+func (e DuplicateCredentialsKeyError) Error() string {
+	return fmt.Sprintf("%s credential has duplicate key '%s' (already defined by %s credential)", index2human(e.index), e.message, index2human(e.first))
+}
+
+/*
+	type DuplicateCredentialsKeyError struct {
+		message string
+		index   int
+		first   int
+	}
+
+	func (e *DuplicateCredentialsKeyError) Error() string {
+		return fmt.Sprintf("%s credential has duplicate key '%s' (allready defined by %s credential) ", index2human(e.index), e.message, index2human(e.first))
+	}
+*/
+func NewDefaultConfig() *Config {
+	return &Config{
+		MetricsPath:          "/metrics",
+		ProbePath:            "/probe",
+		Credentials:          make([]Credentials, 0),
+		LegacyMode:           true,
+		MustConnectOnStartup: true,
+	}
+}
+
+func (c *Config) ReadFromFile(path string) error {
 	var err error
 	var data []byte
 	if path == "" {
-		return nil, nil
+		return ErrorNoConfigFileGiven
 	}
-	config := NewDefaultConfig()
+	// Turn off legacyMode
+	c.LegacyMode = false
 
 	data, err = os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	err = yaml.Unmarshal(data, config)
+	err = yaml.Unmarshal(data, c)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	if len(config.PgBouncers) == 0 {
-		return nil, ErrNoPgbouncersConfigured
-	}
-
-	for _, instance := range config.PgBouncers {
-		if strings.TrimSpace(instance.DSN) == "" {
-			return nil, ErrEmptyPgbouncersDSN
+	var credErr CredentialsErrorInterface
+	keyCount := map[string]int{}
+	for i, credential := range c.Credentials {
+		if credErr = credential.Validate(); credErr != nil {
+			credErr.SetIndex(i + 1)
+			return credErr
 		}
-	}
-
-	return config, nil
-
-}
-
-type Config struct {
-	MustConnectOnStartup bool              `yaml:"must_connect_on_startup"`
-	ExtraLabels          map[string]string `yaml:"extra_labels"`
-	PgBouncers           []PgBouncerConfig `yaml:"pgbouncers"`
-	MetricsPath          string            `yaml:"metrics_path"`
-}
-type PgBouncerConfig struct {
-	DSN         string            `yaml:"dsn"`
-	PidFile     string            `yaml:"pid-file"`
-	ExtraLabels map[string]string `yaml:"extra_labels"`
-}
-
-func (p *Config) AddPgbouncerConfig(dsn string, pidFilePath string, extraLabels map[string]string) {
-	p.PgBouncers = append(
-		p.PgBouncers,
-		PgBouncerConfig{
-			DSN:         dsn,
-			PidFile:     pidFilePath,
-			ExtraLabels: extraLabels,
-		},
-	)
-}
-
-func (p *Config) MergedExtraLabels(extraLabels map[string]string) map[string]string {
-	mergedLabels := make(map[string]string)
-	maps.Copy(mergedLabels, p.ExtraLabels)
-	maps.Copy(mergedLabels, extraLabels)
-
-	return mergedLabels
-}
-
-func (p Config) ValidateLabels() error {
-
-	var labels = make(map[string]int)
-	var keys = make(map[string]int)
-	for _, cfg := range p.PgBouncers {
-
-		var slabels []string
-
-		for k, v := range p.MergedExtraLabels(cfg.ExtraLabels) {
-			slabels = append(slabels, fmt.Sprintf("%s=%s", k, v))
-			keys[k]++
-		}
-		slices.Sort(slabels)
-		hash := strings.Join(slabels, ",")
-		if _, ok := labels[hash]; ok {
-			return fmt.Errorf("Every pgbouncer instance must have unique label values,"+
-				" found the following label=value combination multiple times: '%s'", hash)
-		}
-		labels[hash] = 1
-	}
-
-	for k, amount := range keys {
-		if amount != len(p.PgBouncers) {
-			return fmt.Errorf("Every pgbouncer instance must define the same extra labels,"+
-				" the label '%s' is only found on %d of the %d instances", k, amount, len(p.PgBouncers))
+		if first, ok := keyCount[credential.GetKey()]; !ok {
+			keyCount[credential.GetKey()] = i
+		} else {
+			return &DuplicateCredentialsKeyError{credential.GetKey(), i + 1, first + 1}
+			//return fmt.Errorf("credential %d: duplicate key '%s' (allready defined by credential %d) ", i+1, credential.GetKey(), first+1)
 		}
 	}
 
 	return nil
+}
+
+type Config struct {
+	MetricsPath          string        `yaml:"metrics_path"`
+	ProbePath            string        `yaml:"probe_path"`
+	Credentials          []Credentials `yaml:"credentials"`
+	LegacyMode           bool          `yaml:"legacy_mode"`
+	DSN                  string        `yaml:"dsn"`
+	PidFile              string        `yaml:"pid_file"`
+	MustConnectOnStartup bool          `yaml:"must_connect_on_startup"`
+}
+
+func (c *Config) GetCredentials(key string) (Credentials, error) {
+	for _, cred := range c.Credentials {
+		if cred.GetKey() == key {
+			return cred, nil
+		}
+	}
+
+	return Credentials{}, fmt.Errorf("credential %s not found", key)
 
 }

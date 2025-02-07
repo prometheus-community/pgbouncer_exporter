@@ -14,9 +14,6 @@
 package main
 
 import (
-	"net/http"
-	"os"
-
 	"github.com/alecthomas/kingpin/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
@@ -27,6 +24,9 @@ import (
 	"github.com/prometheus/common/version"
 	"github.com/prometheus/exporter-toolkit/web"
 	"github.com/prometheus/exporter-toolkit/web/kingpinflag"
+	"net/http"
+	"net/url"
+	"os"
 )
 
 const namespace = "pgbouncer"
@@ -36,6 +36,7 @@ const (
 	ExitCodeWebServerError
 	ExitConfigFileReadError
 	ExitConfigFileContentError
+	ExitConfigError
 )
 
 func main() {
@@ -59,8 +60,10 @@ func main() {
 	flag.AddFlags(kingpin.CommandLine, promslogConfig)
 
 	var (
+		metricsPath = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default(config.MetricsPath).String()
+		probePath   = kingpin.Flag("web.probe-path", "Path under which to expose probe metrics.").Default(config.ProbePath).String()
+
 		connectionStringPointer = kingpin.Flag("pgBouncer.connectionString", "Connection string for accessing pgBouncer.").Default("postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable").Envar("PGBOUNCER_EXPORTER_CONNECTION_STRING").String()
-		metricsPath             = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default(config.MetricsPath).String()
 		pidFilePath             = kingpin.Flag("pgBouncer.pid-file", pidFileHelpText).Default("").String()
 
 		configFilePath = kingpin.Flag("config.file", cfgFileHelpText).Default("").String()
@@ -75,46 +78,88 @@ func main() {
 
 	logger := promslog.New(promslogConfig)
 
-	// If config file is used, read config from file
-	// Else use the legacy command-line parameters
+	// Update config with values from the command-line parameters
+	if metricsPath != nil && *metricsPath != "" {
+		config.MetricsPath = *metricsPath
+	}
+	if probePath != nil && *probePath != "" {
+		config.ProbePath = *probePath
+	}
+	if connectionStringPointer != nil && *connectionStringPointer != "" {
+		config.DSN = *connectionStringPointer
+	}
+	if pidFilePath != nil && *pidFilePath != "" {
+		config.PidFile = *pidFilePath
+	}
+
+	// Read and apply config from config file.
+	// When using a config file legacy_mode is disabled by default.
 	if configFilePath != nil && *configFilePath != "" {
-		config, err = NewConfigFromFile(*configFilePath)
+		err = config.ReadFromFile(*configFilePath)
 		if err != nil {
 			logger.Error("Error reading config file", "file", *configFilePath, "err", err)
 			os.Exit(ExitConfigFileReadError)
 		}
-	} else {
-		config.AddPgbouncerConfig(*connectionStringPointer, *pidFilePath, nil)
-		config.MetricsPath = *metricsPath
 	}
 
-	// When running multiple connection every connection must have the same labels but a unique value combination
-	if err = config.ValidateLabels(); err != nil {
-		logger.Error("Error while validating labels: ", "file", *configFilePath, "err", err)
-		os.Exit(ExitConfigFileContentError)
+	if config.MetricsPath == config.ProbePath {
+		logger.Error("Metrics and probe paths cannot be the same path", "metrics", config.MetricsPath, "probe", config.ProbePath)
+		os.Exit(ExitConfigError)
 	}
 
-	// Add an exporter for each connection with the extra labels merged
-	reg := prometheus.DefaultRegisterer
-	for _, pgbouncer := range config.PgBouncers {
+	if config.LegacyMode {
 
-		// Merge the comment extra_labels with the extra_labels per connection
-		extraLabels := config.MergedExtraLabels(pgbouncer.ExtraLabels)
+		logger.Info("Running in legacy mode")
 
-		// Add base exporter
-		exporter := NewExporter(pgbouncer.DSN, namespace, logger, config.MustConnectOnStartup)
-		prometheus.WrapRegistererWith(extraLabels, reg).MustRegister(exporter)
+		// In legacy mode start the exporter in single-target mode with one scrape endpoint en no probe option
+		exporter := NewExporter(config.DSN, namespace, logger, config.MustConnectOnStartup)
+		prometheus.MustRegister(exporter)
 
-		// Add process exporter
-		if pgbouncer.PidFile != "" {
+		if config.PidFile != "" {
 			procExporter := collectors.NewProcessCollector(
 				collectors.ProcessCollectorOpts{
-					PidFn:     prometheus.NewPidFileFn(pgbouncer.PidFile),
+					PidFn:     prometheus.NewPidFileFn(config.PidFile),
 					Namespace: namespace,
 				},
 			)
-			prometheus.WrapRegistererWith(extraLabels, reg).MustRegister(procExporter)
+			prometheus.MustRegister(procExporter)
 		}
+	} else {
+		logger.Info("Running in multi-target mode")
+		http.HandleFunc(config.ProbePath, func(w http.ResponseWriter, r *http.Request) {
+			params := r.URL.Query()
+
+			// Get DSN
+			dsn := params.Get("dsn")
+			dsnURL, err := url.Parse(dsn)
+			if err != nil {
+				logger.Warn("Error parsing dsn", "dsn", dsn, "err", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+
+			// Apply Credential
+			cred := params.Get("cred")
+			if cred != "" {
+				creds, err := config.GetCredentials(cred)
+				if err != nil {
+					logger.Error("Error getting credentials", "cred", cred, "err", err)
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				creds.UpdateDSN(dsnURL)
+			}
+
+			registry := prometheus.NewRegistry()
+			err = registry.Register(NewExporter(dsnURL.String(), namespace, logger, false))
+			if err != nil {
+				logger.Error("Error registering exporter", "err", err)
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			h := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
+			h.ServeHTTP(w, r)
+		})
 	}
 
 	prometheus.MustRegister(versioncollector.NewCollector("pgbouncer_exporter"))
@@ -123,15 +168,20 @@ func main() {
 	logger.Info("Build context", "build_context", version.BuildContext())
 
 	http.Handle(config.MetricsPath, promhttp.Handler())
-	if config.MetricsPath != "/" && config.MetricsPath != "" {
+
+	if config.MetricsPath != "/" && config.MetricsPath != "" && config.ProbePath != "/" && config.ProbePath != "" {
 		landingConfig := web.LandingConfig{
 			Name:        "PgBouncer Exporter",
 			Description: "Prometheus Exporter for PgBouncer servers",
 			Version:     version.Info(),
 			Links: []web.LandingLinks{
 				{
-					Address: *metricsPath,
+					Address: config.MetricsPath,
 					Text:    "Metrics",
+				},
+				{
+					Address: config.ProbePath,
+					Text:    "Probe",
 				},
 			},
 		}

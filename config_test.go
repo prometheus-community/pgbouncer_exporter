@@ -13,9 +13,9 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/google/go-cmp/cmp"
 	"io/fs"
-	"maps"
 	"strings"
 	"testing"
 )
@@ -24,133 +24,113 @@ func TestDefaultConfig(t *testing.T) {
 
 	config := NewDefaultConfig()
 
-	MustConnectOnStartupWant := true
-	if config.MustConnectOnStartup != MustConnectOnStartupWant {
-		t.Errorf("MustConnectOnStartup does not match. Want: %v, Got: %v", MustConnectOnStartupWant, config.MustConnectOnStartup)
-	}
-
 	MetricsPathWant := "/metrics"
 	if config.MetricsPath != MetricsPathWant {
-		t.Errorf("MustConnectOnStartup does not match. Want: %v, Got: %v", MetricsPathWant, config.MustConnectOnStartup)
+		t.Errorf("MetricsPath does not match. Want: %v, Got: %v", MetricsPathWant, config.MetricsPath)
+	}
+
+	ProbePathWant := "/probe"
+	if config.ProbePath != ProbePathWant {
+		t.Errorf("ProbePath does not match. Want: %v, Got: %v", ProbePathWant, config.ProbePath)
 	}
 
 }
 
 func TestUnHappyFileConfig(t *testing.T) {
 
-	var config *Config
+	config := NewDefaultConfig()
 	var err error
 
-	config, err = NewConfigFromFile("")
-	if config != nil || err != nil {
-		t.Errorf("NewConfigFromFile should return nil for config and error if path is empty. Got: %v", err)
+	err = config.ReadFromFile("")
+	if errors.Is(err, ErrorNoConfigFileGiven) == false {
+		t.Errorf("config.ReadFromFile should return ErrorNoConfigFileGiven error. Got: %v", err)
 	}
 
-	_, err = NewConfigFromFile("./testdata/i-do-not-exist.yaml")
+	err = config.ReadFromFile("./testdata/i-do-not-exist.yaml")
 	if errors.Is(err, fs.ErrNotExist) == false {
-		t.Errorf("NewConfigFromFile should return fs.ErrNotExist error. Got: %v", err)
+		t.Errorf("config.ReadFromFile should return fs.ErrNotExist error. Got: %v", err)
 	}
 
-	_, err = NewConfigFromFile("./testdata/parse_error.yaml")
+	err = config.ReadFromFile("./testdata/parse_error.yaml")
 	if err != nil && strings.Contains(err.Error(), "yaml: line") == false {
-		t.Errorf("NewConfigFromFile should return yaml parse error. Got: %v", err)
+		t.Errorf("config.ReadFromFile should return yaml parse error. Got: %v", err)
 	}
 
-	_, err = NewConfigFromFile("./testdata/empty.yaml")
-	if errors.Is(err, ErrNoPgbouncersConfigured) == false {
-		t.Errorf("NewConfigFromFile should return ErrNoPgbouncersConfigured error. Got: %v", err)
+	err = config.ReadFromFile("./testdata/duplicate_creds.yaml")
+	var dcke *DuplicateCredentialsKeyError
+	if errors.As(err, &dcke) == false {
+		t.Errorf("config.ReadFromFile should return DuplicateCredentialsKeyError error. Got: %v", err)
 	}
 
-	_, err = NewConfigFromFile("./testdata/no-dsn.yaml")
-	if errors.Is(err, ErrEmptyPgbouncersDSN) == false {
-		t.Errorf("NewConfigFromFile should return ErrEmptyPgbouncersDSN error. Got: %v", err)
+	err = config.ReadFromFile("./testdata/invalid_creds.yaml")
+	var ce *CredentialsError
+	if errors.As(err, &ce) == false {
+		t.Errorf("config.ReadFromFile should return CredentialsError error. Got: %v", err)
+	} else if err.(*CredentialsError).field != "ssl.key" {
+		t.Errorf("config.ReadFromFile should return CredentialsError for field key. Got: %v", err)
+	}
+
+	for i, v := range map[int]string{2: "2nd", 3: "3rd", 4: "4th", 15: "15th", 20: "20th", 30: "30th"} {
+		err = DuplicateCredentialsKeyError{message: "test", index: i, first: 1}
+		want := fmt.Sprintf("%s credential has duplicate key 'test' (already defined by 1st credential)", v)
+		if err.Error() != want {
+			t.Errorf("DuplicateCredentialsKeyError did not return expected string. Want %v, Got: %v", want, err.Error())
+		}
 	}
 
 }
 
 func TestFileConfig(t *testing.T) {
 
-	var config *Config
+	config := NewDefaultConfig()
 	var err error
 
-	config, err = NewConfigFromFile("./testdata/config.yaml")
+	err = config.ReadFromFile("./testdata/config.yaml")
 	if err != nil {
-		t.Errorf("NewConfigFromFile() should not throw an error: %v", err)
-	}
-
-	MustConnectOnStartupWant := false
-	if config.MustConnectOnStartup != MustConnectOnStartupWant {
-		t.Errorf("MustConnectOnStartup does not match. Want: %v, Got: %v", MustConnectOnStartupWant, config.MustConnectOnStartup)
+		t.Errorf("config.ReadFromFile() should not throw an error: %v", err)
 	}
 
 	MetricsPathWant := "/prom"
 	if config.MetricsPath != MetricsPathWant {
-		t.Errorf("MustConnectOnStartup does not match. Want: %v, Got: %v", MetricsPathWant, config.MustConnectOnStartup)
+		t.Errorf("MetricsPath does not match. Want: %v, Got: %v", MetricsPathWant, config.MetricsPath)
 	}
 
-	CommonExtraLabelsWant := map[string]string{"environment": "sandbox"}
-	if maps.Equal(config.ExtraLabels, CommonExtraLabelsWant) == false {
-		t.Errorf("ExtraLabels does not match. Want: %v, Got: %v", CommonExtraLabelsWant, config.ExtraLabels)
+	ProbePathWant := "/data"
+	if config.ProbePath != ProbePathWant {
+		t.Errorf("ProbePath does not match. Want: %v, Got: %v", ProbePathWant, config.ProbePath)
 	}
 
-	pgWants := []PgBouncerConfig{
-		{
-			DSN:         "postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable",
-			PidFile:     "/var/run/pgbouncer1.pid",
-			ExtraLabels: map[string]string{"pgbouncer_instance": "set1-0", "environment": "prod"},
-		},
-		{
-			DSN:         "postgres://postgres:@localhost:6544/pgbouncer?sslmode=disable",
-			PidFile:     "/var/run/pgbouncer2.pid",
-			ExtraLabels: map[string]string{"pgbouncer_instance": "set1-1", "environment": "prod"},
-		},
-	}
-
-	for i := range pgWants {
-		if cmp.Equal(config.PgBouncers[i], pgWants[i]) == false {
-			t.Errorf("PGBouncer config %d does not match. Want: %v, Got: %v", i, pgWants[i], config.PgBouncers[i])
-		}
-	}
-
-	err = config.ValidateLabels()
+	CredKeyWant := "cred_c"
+	cred, err := config.GetCredentials(CredKeyWant)
 	if err != nil {
-		t.Errorf("ValidateLabels() throws an unexpected error: %v", err)
+		t.Errorf("config.GetCredentials() should not throw an error: %v", err)
+	}
+	if cred.GetKey() != "cred_c" {
+		t.Errorf("Key of retreived credential does not match. Want: %v, Got: %v", CredKeyWant, cred.GetKey())
 	}
 
-}
-
-func TestNotUniqueLabels(t *testing.T) {
-
-	config := NewDefaultConfig()
-
-	config.AddPgbouncerConfig("", "", map[string]string{"pgbouncer_instance": "set1-0", "environment": "prod"})
-	config.AddPgbouncerConfig("", "", map[string]string{"pgbouncer_instance": "set1-0", "environment": "prod"})
-
-	err := config.ValidateLabels()
+	_, err = config.GetCredentials("cred_d")
 	if err == nil {
-		t.Errorf("ValidateLabels() did not throw an error ")
-	}
-	errorWant := "Every pgbouncer instance must have unique label values, found the following label=value combination multiple times: 'environment=prod,pgbouncer_instance=set1-0'"
-	if err.Error() != errorWant {
-		t.Errorf("ValidateLabels() did not throw the expected error.\n- Want: %s\n- Got: %s", errorWant, err.Error())
+		t.Errorf("config.GetCredentials should return error. Got: %v", err)
 	}
 
-}
-
-func TestMissingLabels(t *testing.T) {
-
-	config := NewDefaultConfig()
-
-	config.AddPgbouncerConfig("", "", map[string]string{"pgbouncer_instance": "set1-0", "environment": "prod"})
-	config.AddPgbouncerConfig("", "", map[string]string{"pgbouncer_instance": "set1-0"})
-
-	err := config.ValidateLabels()
-	if err == nil {
-		t.Errorf("ValidateLabels() did not throw an error ")
+	credWants := []Credentials{
+		{
+			Key:      "cred_a",
+			Username: "user",
+			Password: "pass",
+		},
+		{
+			Key:      "",
+			Username: "cred_b",
+			Password: "pass",
+		},
 	}
-	errorWant := "Every pgbouncer instance must define the same extra labels, the label 'environment' is only found on 1 of the 2 instances"
-	if err.Error() != errorWant {
-		t.Errorf("ValidateLabels() did not throw the expected error.\n- Want: %s\n- Got: %s", errorWant, err.Error())
+
+	for i := range credWants {
+		if cmp.Equal(config.Credentials[i], credWants[i]) == false {
+			t.Errorf("Credentials config %d does not match. Want: %v, Got: %v", i, credWants[i], config.Credentials[i])
+		}
 	}
 
 }

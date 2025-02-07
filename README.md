@@ -16,13 +16,44 @@ To see all available configuration flags:
 
     ./pgbouncer_exporter -h
 
-### Export multiple PGBouncer instances
+### Config file
+The exporter can be configured using a config file using the `--config.file` flag.  
+When using a config file the default operation changes from single-target to multi-target mode. <sup>Can be set by `legacy_mode`</sup> 
 
-If you want to export metrics for multiple PGBouncer instances without running multiple exporters you can use the config.file option
+For more information about the possibilities and requirements see [the example config.yaml file within this repo](config.yaml)
 
     ./pgbouncer_exporter --config.file config.yaml
 
-For more information about the possibilities and requirements see [the example config.yaml file within this repo](config.yaml) 
+### Multi-Target mode
+
+In multi-target mode this exporter adheres to the https://prometheus.io/docs/guides/multi-target-exporter/ pattern.
+The probe endpoints accepts 2 parameters:
+
+- `dsn`: the postgresql connection string
+- `cred`: credential reference to credentials stored in the config file.
+
+When `cred` is used the dsn will be updated with the credential values from the config file. 
+If the DSN and credentials config define the same parameter the latter takes precedence.    
+With the example below the exporter will scrape `"postgres://username:password@localhost:6543/pgbouncer?sslmode=disable"`.
+
+*mtls with client certificates is also supported through the use of credentials config* 
+
+`prometheus.yaml`:
+```yaml
+- job_name: pgbouncer-exporter
+  metrics_path: /probe
+  params:
+    dsn: "postgres://localhost:6543/pgbouncer?sslmode=disable"
+    cred: "monitoring"
+```
+
+`config.yaml`
+```yaml
+credentials:
+  - key: monitoring 
+    username: username
+    password: password
+```
 
 ## PGBouncer configuration
 

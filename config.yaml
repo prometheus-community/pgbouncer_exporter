@@ -1,33 +1,38 @@
+## metrics_path: /path/for/metrics; Default: /metrics
+metrics_path: /metrics
+## probe_path: /path/for/probe; Default: /probe
+probe_path: /probe
+
+## Turn on legacy mode, where the exporter scrapes a configured endpoint and exposes the metrics on the metrics_path
+## Defaults to false when using config file
+legacy_mode: false
+## dsn connection uri when using legacy_mode
+dsn: postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable
+## pgbouncer pid file when using legacy_mode
+pid_file:
 ## must_connect_on_startup: true|false; Default: true
 ## If true the exporter will fail to start if any connection fails to connect within the startup fase.
 ## If false the exporter will start even if some connections fail.
 must_connect_on_startup: false
 
-## extra_labels: map of label:value; Default: empty
-## These common extra labels will be set on all metrics for all connections. The value can be overridden per connection
-## Note: Every connection MUST have the same set of labels but a unique set of values.
-extra_labels:
-  environment: test
+  ## Credentials for multi-target usage
+  credentials:
+    - key: monitoring # Optional, if key is not the username is used as credential key
+      username: username
+      password: password
 
-## metrics_path: /path/for/metrics; Default: /metrics
-metrics_path: /metrics
 
-## All the PGBouncers to scrape,
-## when multiple connections are used, extra_labels is required to give every connection a unique set of label values
-pgbouncers:
-  - dsn: postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable    # Connection string for the pgbouncer instance (Required)
-    pid-file: /path/to/pidfile                                            # Add path to pgbouncer pid file to enable the process exporter metrics, Default: empty
-    extra_labels:                                                         # Extra labels to identify the metrics for each instance. As mentioned
-      pgbouncer_instance: set1-0                                          # Example: a unique identifier for each pgbouncer instance.
-      environment: prod                                                   # Example: a shared label for multiple pgbouncer instances
-  - dsn: postgres://postgres:@localhost:6544/pgbouncer?sslmode=disable
-    pid-file:
-    extra_labels:
-      pgbouncer_instance: set1-1
-      environment: prod
-  - dsn: postgres://postgres:@localhost:6545/pgbouncer?sslmode=disable
-    pid-file:
-    extra_labels:
-      pgbouncer_instance: set2-0
-      ## the metrics of this instance will have the additional labels: {environment: "test", pgbouncer_instance: "set2-0"}
-      ## as `environment: "test"` is inherited from common extra_labels
+  - username: sslstats # Optional, if key is not the username is used as credential key
+    ## SSL Connection parameters
+    ## for more info see the corresponding ssl* parameters in
+    ## https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNECT-SSLMODE
+    ssl:
+      mode: "verify-full"         # optional, Defaults to `prefer`
+      cert: testdata/client.crt   # path to the certificate file
+      key: testdata/client.key    # path to the private key file
+      password: ""                # required if private key is password protected
+      compression: 1              # optional: 1 = enable, 0 = disable, default to `0`
+      negotiation: "direct"       # optional, defaults to `postgres`
+      cert_mode: "require"        # optional, defaults to `allow`
+      root_cert: "system"         # optional, path to allowed server CA's, or `system` for system's ca store
+
