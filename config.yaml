@@ -1,0 +1,37 @@
+## metrics_path: /path/for/metrics; Default: /metrics
+metrics_path: /metrics
+## probe_path: /path/for/probe; Default: /probe
+probe_path: /probe
+
+## Turn on legacy mode, where the exporter scrapes a configured endpoint and exposes the metrics on the metrics_path
+## Defaults to false when using config file
+legacy_mode: false
+## dsn connection uri when using legacy_mode
+dsn: postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable
+## pgbouncer pid file when using legacy_mode
+pid_file:
+## must_connect_on_startup: true|false; Default: true
+## If true the exporter will fail to start if any connection fails to connect within the startup fase.
+## If false the exporter will start even if some connections fail.
+must_connect_on_startup: false
+
+## Credentials for multi-target usage
+credentials:
+  - key: monitoring # Optional, if key is not the username is used as credential key
+    username: username
+    password: password
+
+
+  - username: sslstats # Optional, if key is not the username is used as credential key
+    ## SSL Connection parameters
+    ## for more info see the corresponding ssl* parameters in
+    ## https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNECT-SSLMODE
+    ssl:
+      mode: "verify-full"         # optional, Defaults to `prefer`
+      cert: testdata/client.crt   # path to the certificate file
+      key: testdata/client.key    # path to the private key file
+      password: ""                # required if private key is password protected
+      compression: 1              # optional: 1 = enable, 0 = disable, default to `0`
+      negotiation: "direct"       # optional, defaults to `postgres`
+      cert_mode: "require"        # optional, defaults to `allow`
+      root_cert: "system"         # optional, path to allowed server CA's, or `system` for system's ca store

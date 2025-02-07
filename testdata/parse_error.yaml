@@ -1,0 +1,8 @@
+# yamllint disable-file
+# This file is invalid on purpose and should throw errors
+metrics_path: /metrics
+probe_path: /probe
+
+credentials:
+  key: value
+    - trigger: parse_error #syntax error: mapping values are not allowed here (syntax)

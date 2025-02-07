@@ -5,12 +5,15 @@ go 1.22
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/alecthomas/kingpin/v2 v2.4.0
+	github.com/google/go-cmp v0.6.0
+	github.com/google/go-querystring v1.1.0
 	github.com/lib/pq v1.10.9
 	github.com/prometheus/client_golang v1.20.4
 	github.com/prometheus/client_model v0.6.1
 	github.com/prometheus/common v0.61.0
 	github.com/prometheus/exporter-toolkit v0.13.2
 	github.com/smartystreets/goconvey v1.8.1
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
