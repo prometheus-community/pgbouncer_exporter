@@ -15,11 +15,11 @@ pid_file:
 ## If false the exporter will start even if some connections fail.
 must_connect_on_startup: false
 
-  ## Credentials for multi-target usage
-  credentials:
-    - key: monitoring # Optional, if key is not the username is used as credential key
-      username: username
-      password: password
+## Credentials for multi-target usage
+credentials:
+  - key: monitoring # Optional, if key is not the username is used as credential key
+    username: username
+    password: password
 
 
   - username: sslstats # Optional, if key is not the username is used as credential key
@@ -35,4 +35,3 @@ must_connect_on_startup: false
       negotiation: "direct"       # optional, defaults to `postgres`
       cert_mode: "require"        # optional, defaults to `allow`
       root_cert: "system"         # optional, path to allowed server CA's, or `system` for system's ca store
-
