@@ -1,0 +1,13 @@
+metrics_path: /metrics
+probe_path: /probe
+
+credentials:
+  - key: stats
+    username: user
+    password: pass
+    ssl:
+      mode: verify-full
+      cert: testdata/client.crt
+      key: testdata/missing_client.key
+
+

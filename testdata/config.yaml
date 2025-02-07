@@ -1,0 +1,14 @@
+metrics_path: /prom
+probe_path: /data
+
+credentials:
+  - key: cred_a
+    username: user
+    password: pass
+  - username: cred_b
+    password: pass
+  - username: cred_c
+    ssl:
+      mode: verify-full
+      cert: testdata/client.crt
+      key: testdata/client.key

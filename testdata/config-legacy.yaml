@@ -1,0 +1,8 @@
+metrics_path: /metrics
+probe_path: /probe
+
+legacy_mode: true
+dsn: postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable
+pid_file:
+must_connect_on_startup: true
+
