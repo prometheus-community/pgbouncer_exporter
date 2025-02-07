@@ -170,7 +170,7 @@ func TestUpdateDSN(t *testing.T) {
 	}
 
 	dsn, _ = url.Parse(startDSN)
-	wantSSL := "postgres://username@localhost:6543/pgbouncer?sslcert=testdata%2Fclient.crt&sslcertmode=allow&sslkey=testdata%2Fclient.crt&sslmode=verify-full&sslnegotiation=postgres&sslpassword=password&sslrootcert=testdata%2Fclient.crt"
+	wantSSL := "postgres://username@localhost:6543/pgbouncer?sslcert=testdata%2Fclient.crt&sslcertmode=allow&sslcompression=1&sslkey=testdata%2Fclient.crt&sslmode=verify-full&sslnegotiation=postgres&sslpassword=password&sslrootcert=testdata%2Fclient.crt"
 
 	sslCred.UpdateDSN(dsn)
 	if dsn.String() != wantSSL {
