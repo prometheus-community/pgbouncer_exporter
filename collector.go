@@ -110,6 +110,9 @@ var (
 	}
 
 	configMap = map[string]*(prometheus.Desc){
+		"auth_type": prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "config", "authorization_type"),
+			"Config maximum number of client connections", []string{"method"}, nil),
 		"max_client_conn": prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "config", "max_client_connections"),
 			"Config maximum number of client connections", nil, nil),
@@ -223,11 +226,14 @@ func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logge
 		}
 
 		value, err := strconv.ParseFloat(string(values), 64)
+		labelValues := []string{}
 		if err != nil {
-			return fmt.Errorf("error parsing SHOW CONFIG column: %v, error: %w ", key, err)
+			// We couldn't parse the value as a float, so treat it as a string
+			value = 1.0
+			labelValues = append(labelValues, string(values))
 		}
 		if metric, ok := configMap[key]; ok {
-			ch <- prometheus.MustNewConstMetric(metric, prometheus.GaugeValue, value)
+			ch <- prometheus.MustNewConstMetric(metric, prometheus.GaugeValue, value, labelValues...)
 		} else {
 			logger.Debug("SHOW CONFIG unknown config", "config", key)
 		}
