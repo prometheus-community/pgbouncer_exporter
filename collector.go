@@ -131,6 +131,11 @@ var (
 		"The pgbouncer scrape succeeded",
 		nil, nil,
 	)
+	serverCountDescription = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "", "server_connections"),
+		"Server connections with state information",
+		[]string{"user", "database", "state", "addr", "close_needed"}, nil,
+	)
 )
 
 func NewExporter(connectionString string, namespace string, logger *slog.Logger) *Exporter {
@@ -232,6 +237,87 @@ func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logge
 			logger.Debug("SHOW CONFIG unknown config", "config", key)
 		}
 	}
+	return nil
+}
+
+// Query SHOW SERVER, which has multiple
+func queryShowServers(ch chan<- prometheus.Metric, db *sql.DB, _ *slog.Logger) error {
+	rows, err := db.Query("SHOW SERVERS;")
+	if err != nil {
+		return fmt.Errorf("error running SHOW SERVERS on database: %w", err)
+	}
+	defer rows.Close()
+
+	columnNames, err := rows.Columns()
+	if err != nil {
+		return fmt.Errorf("error retrieving columns list from SHOW CONFIG: %w", err)
+	}
+	numColumns := len(columnNames)
+
+	type counterKey struct {
+		user        string
+		database    string
+		state       string
+		addr        string
+		port        int
+		closeNeeded int
+	}
+	counters := make(map[counterKey]int)
+
+	var (
+		serverType         string
+		user               string
+		database           string
+		replication        string
+		state              string
+		addr               string
+		port               int
+		localAddr          string
+		localPort          int
+		connectTime        sql.RawBytes
+		requestTime        sql.RawBytes
+		wait               int
+		waitUS             int
+		closeNeeded        int
+		ptr                sql.RawBytes
+		link               sql.RawBytes
+		remotePid          int
+		tls                string
+		applicationName    string
+		preparedStatements int
+	)
+	for rows.Next() {
+		switch numColumns {
+		case 20:
+			if err = rows.Scan(&serverType, &user, &database, &replication, &state, &addr, &port, &localAddr, &localPort,
+				&connectTime, &requestTime, &wait, &waitUS, &closeNeeded, &ptr, &link, &remotePid, &tls, &applicationName,
+				&preparedStatements); err != nil {
+				return fmt.Errorf("error retrieving SHOW SERVERS rows: %w", err)
+			}
+		case 19:
+			if err = rows.Scan(&serverType, &user, &database, &state, &addr, &port, &localAddr, &localPort,
+				&connectTime, &requestTime, &wait, &waitUS, &closeNeeded, &ptr, &link, &remotePid, &tls, &applicationName,
+				&preparedStatements); err != nil {
+				return fmt.Errorf("error retrieving SHOW SERVERS rows: %w", err)
+			}
+		}
+
+		ck := counterKey{
+			user,
+			database,
+			state,
+			addr,
+			port,
+			closeNeeded,
+		}
+		counters[ck]++
+	}
+
+	for key, value := range counters {
+		ch <- prometheus.MustNewConstMetric(serverCountDescription, prometheus.GaugeValue, float64(value),
+			key.user, key.database, key.state, fmt.Sprintf("%s_%d", key.addr, key.port), strconv.FormatBool(key.closeNeeded == 1))
+	}
+
 	return nil
 }
 
@@ -486,6 +572,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	if err = queryShowConfig(ch, e.db, e.logger); err != nil {
 		e.logger.Error("error getting SHOW CONFIG", "err", err.Error())
+		up = 0
+	}
+
+	if err = queryShowServers(ch, e.db, e.logger); err != nil {
+		e.logger.Error("error getting SHOW SERVERS", "err", err.Error())
 		up = 0
 	}
 
