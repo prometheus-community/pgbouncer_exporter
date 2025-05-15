@@ -15,15 +15,16 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math"
 	"os"
+	"regexp"
 	"strconv"
 	"time"
 	"unicode/utf8"
 
+	"github.com/blang/semver/v4"
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -31,45 +32,45 @@ import (
 var (
 	metricMaps = map[string]map[string]ColumnMapping{
 		"databases": {
-			"name":                {LABEL, "N/A", 1, "N/A"},
-			"host":                {LABEL, "N/A", 1, "N/A"},
-			"port":                {LABEL, "N/A", 1, "N/A"},
-			"database":            {LABEL, "N/A", 1, "N/A"},
-			"force_user":          {LABEL, "N/A", 1, "N/A"},
-			"pool_size":           {GAUGE, "pool_size", 1, "Maximum number of server connections"},
-			"reserve_pool":        {GAUGE, "reserve_pool", 1, "Maximum number of additional connections for this database"},
-			"pool_mode":           {LABEL, "N/A", 1, "N/A"},
-			"max_connections":     {GAUGE, "max_connections", 1, "Maximum number of allowed connections for this database"},
-			"current_connections": {GAUGE, "current_connections", 1, "Current number of connections for this database"},
-			"paused":              {GAUGE, "paused", 1, "1 if this database is currently paused, else 0"},
-			"disabled":            {GAUGE, "disabled", 1, "1 if this database is currently disabled, else 0"},
+			"name":                {LABEL, "N/A", 1, "N/A", semver.Version{}},
+			"host":                {LABEL, "N/A", 1, "N/A", semver.Version{}},
+			"port":                {LABEL, "N/A", 1, "N/A", semver.Version{}},
+			"database":            {LABEL, "N/A", 1, "N/A", semver.Version{}},
+			"force_user":          {LABEL, "N/A", 1, "N/A", semver.Version{}},
+			"pool_size":           {GAUGE, "pool_size", 1, "Maximum number of server connections", semver.Version{}},
+			"reserve_pool":        {GAUGE, "reserve_pool", 1, "Maximum number of additional connections for this database", semver.Version{}},
+			"pool_mode":           {LABEL, "N/A", 1, "N/A", semver.Version{}},
+			"max_connections":     {GAUGE, "max_connections", 1, "Maximum number of allowed connections for this database", semver.Version{}},
+			"current_connections": {GAUGE, "current_connections", 1, "Current number of connections for this database", semver.Version{}},
+			"paused":              {GAUGE, "paused", 1, "1 if this database is currently paused, else 0", semver.Version{}},
+			"disabled":            {GAUGE, "disabled", 1, "1 if this database is currently disabled, else 0", semver.Version{}},
 		},
 		"stats": {
-			"database":          {LABEL, "N/A", 1, "N/A"},
-			"total_query_count": {COUNTER, "queries_pooled_total", 1, "Total number of SQL queries pooled"},
-			"total_query_time":  {COUNTER, "queries_duration_seconds_total", 1e-6, "Total number of seconds spent by pgbouncer when actively connected to PostgreSQL, executing queries"},
-			"total_received":    {COUNTER, "received_bytes_total", 1, "Total volume in bytes of network traffic received by pgbouncer, shown as bytes"},
-			"total_requests":    {COUNTER, "queries_total", 1, "Total number of SQL requests pooled by pgbouncer, shown as requests"},
-			"total_sent":        {COUNTER, "sent_bytes_total", 1, "Total volume in bytes of network traffic sent by pgbouncer, shown as bytes"},
-			"total_wait_time":   {COUNTER, "client_wait_seconds_total", 1e-6, "Time spent by clients waiting for a server in seconds"},
-			"total_xact_count":  {COUNTER, "sql_transactions_pooled_total", 1, "Total number of SQL transactions pooled"},
-			"total_xact_time":   {COUNTER, "server_in_transaction_seconds_total", 1e-6, "Total number of seconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries"},
+			"database":          {LABEL, "N/A", 1, "N/A", semver.Version{}},
+			"total_query_count": {COUNTER, "queries_pooled_total", 1, "Total number of SQL queries pooled", semver.Version{}},
+			"total_query_time":  {COUNTER, "queries_duration_seconds_total", 1e-6, "Total number of seconds spent by pgbouncer when actively connected to PostgreSQL, executing queries", semver.Version{}},
+			"total_received":    {COUNTER, "received_bytes_total", 1, "Total volume in bytes of network traffic received by pgbouncer, shown as bytes", semver.Version{}},
+			"total_requests":    {COUNTER, "queries_total", 1, "Total number of SQL requests pooled by pgbouncer, shown as requests", semver.Version{}},
+			"total_sent":        {COUNTER, "sent_bytes_total", 1, "Total volume in bytes of network traffic sent by pgbouncer, shown as bytes", semver.Version{}},
+			"total_wait_time":   {COUNTER, "client_wait_seconds_total", 1e-6, "Time spent by clients waiting for a server in seconds", semver.Version{}},
+			"total_xact_count":  {COUNTER, "sql_transactions_pooled_total", 1, "Total number of SQL transactions pooled", semver.Version{}},
+			"total_xact_time":   {COUNTER, "server_in_transaction_seconds_total", 1e-6, "Total number of seconds spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries", semver.Version{}},
 		},
 		"pools": {
-			"database":              {LABEL, "N/A", 1, "N/A"},
-			"user":                  {LABEL, "N/A", 1, "N/A"},
-			"cl_active":             {GAUGE, "client_active_connections", 1, "Client connections linked to server connection and able to process queries, shown as connection"},
-			"cl_active_cancel_req":  {GAUGE, "client_active_cancel_connections", 1, "Client connections that have forwarded query cancellations to the server and are waiting for the server response"},
-			"cl_waiting":            {GAUGE, "client_waiting_connections", 1, "Client connections waiting on a server connection, shown as connection"},
-			"cl_waiting_cancel_req": {GAUGE, "client_waiting_cancel_connections", 1, "Client connections that have not forwarded query cancellations to the server yet"},
-			"sv_active":             {GAUGE, "server_active_connections", 1, "Server connections linked to a client connection, shown as connection"},
-			"sv_active_cancel":      {GAUGE, "server_active_cancel_connections", 1, "Server connections that are currently forwarding a cancel request."},
-			"sv_being_canceled":     {GAUGE, "server_being_canceled_connections", 1, "Servers that normally could become idle but are waiting to do so until all in-flight cancel requests have completed that were sent to cancel a query on this server."},
-			"sv_idle":               {GAUGE, "server_idle_connections", 1, "Server connections idle and ready for a client query, shown as connection"},
-			"sv_used":               {GAUGE, "server_used_connections", 1, "Server connections idle more than server_check_delay, needing server_check_query, shown as connection"},
-			"sv_tested":             {GAUGE, "server_testing_connections", 1, "Server connections currently running either server_reset_query or server_check_query, shown as connection"},
-			"sv_login":              {GAUGE, "server_login_connections", 1, "Server connections currently in the process of logging in, shown as connection"},
-			"maxwait":               {GAUGE, "client_maxwait_seconds", 1, "Age of oldest unserved client connection, shown as second"},
+			"database":              {LABEL, "N/A", 1, "N/A", semver.Version{}},
+			"user":                  {LABEL, "N/A", 1, "N/A", semver.Version{}},
+			"cl_active":             {GAUGE, "client_active_connections", 1, "Client connections linked to server connection and able to process queries, shown as connection", semver.Version{}},
+			"cl_active_cancel_req":  {GAUGE, "client_active_cancel_connections", 1, "Client connections that have forwarded query cancellations to the server and are waiting for the server response", semver.Version{}},
+			"cl_waiting":            {GAUGE, "client_waiting_connections", 1, "Client connections waiting on a server connection, shown as connection", semver.Version{}},
+			"cl_waiting_cancel_req": {GAUGE, "client_waiting_cancel_connections", 1, "Client connections that have not forwarded query cancellations to the server yet", semver.Version{}},
+			"sv_active":             {GAUGE, "server_active_connections", 1, "Server connections linked to a client connection, shown as connection", semver.Version{}},
+			"sv_active_cancel":      {GAUGE, "server_active_cancel_connections", 1, "Server connections that are currently forwarding a cancel request.", semver.Version{}},
+			"sv_being_canceled":     {GAUGE, "server_being_canceled_connections", 1, "Servers that normally could become idle but are waiting to do so until all in-flight cancel requests have completed that were sent to cancel a query on this server.", semver.Version{}},
+			"sv_idle":               {GAUGE, "server_idle_connections", 1, "Server connections idle and ready for a client query, shown as connection", semver.Version{}},
+			"sv_used":               {GAUGE, "server_used_connections", 1, "Server connections idle more than server_check_delay, needing server_check_query, shown as connection", semver.Version{}},
+			"sv_tested":             {GAUGE, "server_testing_connections", 1, "Server connections currently running either server_reset_query or server_check_query, shown as connection", semver.Version{}},
+			"sv_login":              {GAUGE, "server_login_connections", 1, "Server connections currently in the process of logging in, shown as connection", semver.Version{}},
+			"maxwait":               {GAUGE, "client_maxwait_seconds", 1, "Age of oldest unserved client connection, shown as second", semver.Version{}},
 		},
 	}
 
@@ -142,10 +143,17 @@ func NewExporter(connectionString string, namespace string, logger *slog.Logger)
 		os.Exit(1)
 	}
 
+	_, pgbouncerVersion, err := querySemver(db)
+	if err != nil {
+		// Don't fail on error, just log it
+		logger.Debug("error getting pgbouncer version", "err", err.Error())
+	}
+
 	return &Exporter{
-		metricMap: makeDescMap(metricMaps, namespace, logger),
+		metricMap: makeDescMap(metricMaps, namespace, logger, pgbouncerVersion),
 		db:        db,
 		logger:    logger,
+		version:   pgbouncerVersion,
 	}
 }
 
@@ -404,37 +412,37 @@ func queryNamespaceMappings(ch chan<- prometheus.Metric, db *sql.DB, metricMap m
 	return namespaceErrors
 }
 
+// Extract semver from `SHOW VERSION;` output
+// Should be some variation of "PgBouncer 1.23.1"
+var versionRegex = regexp.MustCompile(`^\w+ ((\d+)(\.\d+)?(\.\d+)?)`)
+
+func querySemver(db *sql.DB) (string, semver.Version, error) {
+	var version string
+	err := db.QueryRow("SHOW VERSION;").Scan(&version)
+	if err != nil {
+		return "", semver.Version{}, fmt.Errorf("error getting pgbouncer version: %w", err)
+	}
+	submatches := versionRegex.FindStringSubmatch(version)
+	if len(submatches) > 1 {
+		v, err := semver.ParseTolerant(submatches[1])
+		return version, v, err
+	}
+	return version, semver.Version{}, nil
+}
+
 // Gather the pgbouncer version info.
 func queryVersion(ch chan<- prometheus.Metric, db *sql.DB) error {
-	rows, err := db.Query("SHOW VERSION;")
+	bouncerVersion, _, err := querySemver(db)
+
 	if err != nil {
-		return fmt.Errorf("error getting pgbouncer version: %w", err)
+		return err
 	}
-	defer rows.Close()
-
-	var columnNames []string
-	columnNames, err = rows.Columns()
-	if err != nil {
-		return fmt.Errorf("error retrieving column list for version: %w", err)
-	}
-	if len(columnNames) != 1 || columnNames[0] != "version" {
-		return errors.New("show version didn't return version column")
-	}
-
-	var bouncerVersion string
-
-	for rows.Next() {
-		err := rows.Scan(&bouncerVersion)
-		if err != nil {
-			return err
-		}
-		ch <- prometheus.MustNewConstMetric(
-			bouncerVersionDesc,
-			prometheus.GaugeValue,
-			1.0,
-			bouncerVersion,
-		)
-	}
+	ch <- prometheus.MustNewConstMetric(
+		bouncerVersionDesc,
+		prometheus.GaugeValue,
+		1.0,
+		bouncerVersion,
+	)
 
 	return nil
 }
@@ -502,7 +510,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 }
 
 // Turn the MetricMap column mapping into a prometheus descriptor mapping.
-func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace string, logger *slog.Logger) map[string]MetricMapNamespace {
+func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace string, logger *slog.Logger, pgbouncerVersion semver.Version) map[string]MetricMapNamespace {
 	var metricMap = make(map[string]MetricMapNamespace)
 
 	for metricNamespace, mappings := range metricMaps {
@@ -511,6 +519,13 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 
 		// First collect all the labels since the metrics will need them
 		for columnName, columnMapping := range mappings {
+			fmt.Println(columnName)
+			fmt.Println(columnMapping.minVersion)
+			if pgbouncerVersion.LT(columnMapping.minVersion) {
+				logger.Debug("Skipping column due to version", "column_name", columnName, "metric_namespace", metricNamespace, "min_version", columnMapping.minVersion, "pgbouncer_version", pgbouncerVersion)
+				continue
+			}
+
 			if columnMapping.usage == LABEL {
 				logger.Debug("Adding label", "column_name", columnName, "metric_namespace", metricNamespace)
 				labels = append(labels, columnName)
@@ -519,6 +534,12 @@ func makeDescMap(metricMaps map[string]map[string]ColumnMapping, namespace strin
 
 		for columnName, columnMapping := range mappings {
 			factor := columnMapping.factor
+
+			// Check semver compatibility
+			if pgbouncerVersion.LT(columnMapping.minVersion) {
+				logger.Debug("Skipping column due to version", "column_name", columnName, "metric_namespace", metricNamespace, "min_version", columnMapping.minVersion, "pgbouncer_version", pgbouncerVersion)
+				continue
+			}
 
 			// Determine how to convert the column based on its usage.
 			switch columnMapping.usage {
