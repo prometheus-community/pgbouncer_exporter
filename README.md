@@ -4,6 +4,10 @@
 Prometheus exporter for PgBouncer.
 Exports metrics at `9127/metrics`
 
+## Requirements
+
+- PgBouncer 1.8 or higher, since PgBouncer exporter 0.11.0
+
 ## Building and running
 
     make build
