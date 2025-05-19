@@ -129,3 +129,82 @@ func TestQueryShowConfig(t *testing.T) {
 		t.Errorf("there were unfulfilled exceptions: %s", err)
 	}
 }
+
+func TestQueryShowDatabases(t *testing.T) {
+	rows := sqlmock.NewRows([]string{"name", "host", "port", "database", "pool_size"}).
+		AddRow("pg0_db", "10.10.10.1", "5432", "pg0", 20)
+
+	expected := []MetricResult{
+		{labels: labelMap{"name": "pg0_db", "host": "10.10.10.1", "port": "5432", "database": "pg0", "force_user": "", "pool_mode": ""}, metricType: dto.MetricType_GAUGE, value: 20},
+	}
+
+	testQueryNamespaceMapping(t, "databases", rows, expected)
+}
+
+func TestQueryShowStats(t *testing.T) {
+	// columns are listed in the order PgBouncers exposes them, a value of -1 means pgbouncer_exporter does not expose this value as a metric
+	rows := sqlmock.NewRows([]string{"database",
+		"server_assignment_count",
+		"xact_count", "query_count", "bytes_received", "bytes_sent",
+		"xact_time", "query_time", "wait_time", "client_parse_count", "server_parse_count", "bind_count"}).
+		AddRow("pg0", -1, 10, 40, 220, 460, 6, 8, 9, 5, 55, 555)
+
+	// expected metrics are returned in the same order as the colums
+	expected := []MetricResult{
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 10},   // xact_count
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 40},   // query_count
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 220},  // bytes_received
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 460},  // bytes_sent
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 6e-6}, // xact_time
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 8e-6}, // query_time
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 9e-6}, // wait_time
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 5},    // client_parse_count
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 55},   // server_parse_count
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 555},  // bind_count
+	}
+
+	testQueryNamespaceMapping(t, "stats_totals", rows, expected)
+}
+
+func TestQueryShowPools(t *testing.T) {
+	rows := sqlmock.NewRows([]string{"database", "user", "cl_active"}).
+		AddRow("pg0", "postgres", 2)
+
+	expected := []MetricResult{
+		{labels: labelMap{"database": "pg0", "user": "postgres"}, metricType: dto.MetricType_GAUGE, value: 2},
+	}
+
+	testQueryNamespaceMapping(t, "pools", rows, expected)
+}
+
+func testQueryNamespaceMapping(t *testing.T, namespaceMapping string, rows *sqlmock.Rows, expected []MetricResult) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Error opening a stub db connection: %s", err)
+	}
+	defer db.Close()
+
+	mock.ExpectQuery("SHOW " + namespaceMapping + ";").WillReturnRows(rows)
+
+	logger := slog.Default()
+
+	metricMap := makeDescMap(metricMaps, namespace, logger)
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		if _, err := queryNamespaceMapping(ch, db, namespaceMapping, metricMap[namespaceMapping], logger); err != nil {
+			t.Errorf("Error running queryNamespaceMapping: %s", err)
+		}
+	}()
+
+	convey.Convey("Metrics comparison", t, func() {
+		for _, expect := range expected {
+			m := readMetric(<-ch)
+			convey.So(m, convey.ShouldResemble, expect)
+		}
+	})
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled exceptions: %s", err)
+	}
+}
