@@ -14,6 +14,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 
@@ -30,6 +31,12 @@ import (
 )
 
 const namespace = "pgbouncer"
+
+type Config struct {
+	ConnectionString string `json:"pgBouncer.connectionString"`
+	MetricsPath      string `json:"web.telemetry-path"`
+	PidFilePath      string `json:"pgBouncer.pid-file"`
+}
 
 func main() {
 	const pidFileHelpText = `Path to PgBouncer pid file.
@@ -48,6 +55,9 @@ func main() {
 		connectionStringPointer = kingpin.Flag("pgBouncer.connectionString", "Connection string for accessing pgBouncer.").Default("postgres://postgres:@localhost:6543/pgbouncer?sslmode=disable").Envar("PGBOUNCER_EXPORTER_CONNECTION_STRING").String()
 		metricsPath             = kingpin.Flag("web.telemetry-path", "Path under which to expose metrics.").Default("/metrics").String()
 		pidFilePath             = kingpin.Flag("pgBouncer.pid-file", pidFileHelpText).Default("").String()
+		configFilePath          = kingpin.Flag("config.file", "Path to config file.").Default("").String()
+		filterEmptyPools        = kingpin.Flag("filter.empty_pools", "Filter out pools with no active clients").Default("false").Bool()
+		cacheInterval           = kingpin.Flag("collector.cache-interval", "Interval at which to update metrics cache").Default("2m").Duration()
 	)
 
 	toolkitFlags := kingpinflag.AddFlags(kingpin.CommandLine, ":9127")
@@ -58,12 +68,42 @@ func main() {
 
 	logger := promslog.New(promslogConfig)
 
+	// Read configuration from file if configFilePath is provided
+	if *configFilePath != "" {
+		file, err := os.ReadFile(*configFilePath)
+		if err != nil {
+			logger.Error("Error parsing config file", "file", *configFilePath, "err", err.Error())
+			os.Exit(1)
+		}
+		var config Config
+		if err := json.Unmarshal(file, &config); err != nil {
+			logger.Error("Error parsing config file", "file", *configFilePath, "err", err.Error())
+			os.Exit(1)
+		}
+		// Override flags with config file values
+		if config.ConnectionString != "" {
+			*connectionStringPointer = config.ConnectionString
+		}
+		if config.MetricsPath != "" {
+			*metricsPath = config.MetricsPath
+		}
+		if config.PidFilePath != "" {
+			*pidFilePath = config.PidFilePath
+		}
+	}
+
 	connectionString := *connectionStringPointer
-	exporter := NewExporter(connectionString, namespace, logger)
+
+	// Create cached exporter instead of regular exporter
+	exporter := NewCachedExporter(connectionString, namespace, logger, *filterEmptyPools, *cacheInterval)
+	defer exporter.Close() // Ensure background worker is stopped on exit
+
 	prometheus.MustRegister(exporter)
 	prometheus.MustRegister(versioncollector.NewCollector("pgbouncer_exporter"))
 
-	logger.Info("Starting pgbouncer_exporter", "version", version.Info())
+	logger.Info("Starting pgbouncer_exporter",
+		"version", version.Info(),
+		"cache_interval", cacheInterval.String())
 	logger.Info("Build context", "build_context", version.BuildContext())
 
 	if *pidFilePath != "" {
@@ -76,11 +116,12 @@ func main() {
 		prometheus.MustRegister(procExporter)
 	}
 
+	// Set up HTTP server
 	http.Handle(*metricsPath, promhttp.Handler())
 	if *metricsPath != "/" && *metricsPath != "" {
 		landingConfig := web.LandingConfig{
 			Name:        "PgBouncer Exporter",
-			Description: "Prometheus Exporter for PgBouncer servers",
+			Description: "Prometheus Exporter for PgBouncer servers with metric caching",
 			Version:     version.Info(),
 			Links: []web.LandingLinks{
 				{
