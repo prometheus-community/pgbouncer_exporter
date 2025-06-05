@@ -58,13 +58,17 @@ func main() {
 
 	logger := promslog.New(promslogConfig)
 
-	connectionString := *connectionStringPointer
-	exporter := NewExporter(connectionString, namespace, logger)
-	prometheus.MustRegister(exporter)
-	prometheus.MustRegister(versioncollector.NewCollector("pgbouncer_exporter"))
-
 	logger.Info("Starting pgbouncer_exporter", "version", version.Info())
 	logger.Info("Build context", "build_context", version.BuildContext())
+
+	connectionString := *connectionStringPointer
+	exporter := NewExporter(connectionString, namespace, logger)
+	if exporter == nil {
+		logger.Error("Failed to create exporter")
+		os.Exit(1)
+	}
+	prometheus.MustRegister(exporter)
+	prometheus.MustRegister(versioncollector.NewCollector("pgbouncer_exporter"))
 
 	if *pidFilePath != "" {
 		procExporter := collectors.NewProcessCollector(
