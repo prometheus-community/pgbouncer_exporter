@@ -15,9 +15,10 @@ package main
 
 // Elasticsearch Node Stats Structs
 import (
-	"database/sql"
 	"fmt"
 	"log/slog"
+
+	"github.com/lib/pq"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -102,9 +103,7 @@ type ColumnMapping struct {
 // Exporter collects PgBouncer stats from the given server and exports
 // them using the prometheus metrics package.
 type Exporter struct {
+	conn      *pq.Connector
 	metricMap map[string]MetricMapNamespace
-
-	db *sql.DB
-
-	logger *slog.Logger
+	logger    *slog.Logger
 }
