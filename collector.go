@@ -19,12 +19,12 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"os"
 	"strconv"
 	"time"
 	"unicode/utf8"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
+
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -137,17 +137,15 @@ var (
 )
 
 func NewExporter(connectionString string, namespace string, logger *slog.Logger) *Exporter {
-
-	db, err := getDB(connectionString)
-
+	conn, err := pq.NewConnector(connectionString)
 	if err != nil {
-		logger.Error("error setting up DB connection", "err", err.Error())
-		os.Exit(1)
+		logger.Error("failed to create connector", "error", err)
+		return nil
 	}
 
 	return &Exporter{
+		conn:      conn,
 		metricMap: makeDescMap(metricMaps, namespace, logger),
-		db:        db,
 		logger:    logger,
 	}
 }
@@ -335,10 +333,10 @@ func queryNamespaceMapping(ch chan<- prometheus.Metric, db *sql.DB, namespace st
 	return nonfatalErrors, nil
 }
 
-func getDB(conn string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", conn)
-	if err != nil {
-		return nil, err
+func getDB(conn *pq.Connector) (*sql.DB, error) {
+	db := sql.OpenDB(conn)
+	if db == nil {
+		return nil, errors.New("error opening DB")
 	}
 	rows, err := db.Query("SHOW STATS")
 	if err != nil {
@@ -472,36 +470,47 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements prometheus.Collector.
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
-	e.logger.Info("Starting scrape")
+	e.logger.Debug("Starting scrape")
 
 	var up = 1.0
 
-	err := queryVersion(ch, e.db)
+	defer func() {
+		ch <- prometheus.MustNewConstMetric(scrapeSuccessDesc, prometheus.GaugeValue, up)
+	}()
+
+	db, err := getDB(e.conn)
 	if err != nil {
-		e.logger.Error("error getting version", "err", err.Error())
+		e.logger.Warn("error setting up DB connection", "err", err.Error())
+		up = 0
+		return
+	}
+	defer db.Close()
+
+	err = queryVersion(ch, db)
+	if err != nil {
+		e.logger.Warn("error getting version", "err", err.Error())
 		up = 0
 	}
 
-	if err = queryShowLists(ch, e.db, e.logger); err != nil {
-		e.logger.Error("error getting SHOW LISTS", "err", err.Error())
+	if err = queryShowLists(ch, db, e.logger); err != nil {
+		e.logger.Warn("error getting SHOW LISTS", "err", err.Error())
 		up = 0
 	}
 
-	if err = queryShowConfig(ch, e.db, e.logger); err != nil {
-		e.logger.Error("error getting SHOW CONFIG", "err", err.Error())
+	if err = queryShowConfig(ch, db, e.logger); err != nil {
+		e.logger.Warn("error getting SHOW CONFIG", "err", err.Error())
 		up = 0
 	}
 
-	errMap := queryNamespaceMappings(ch, e.db, e.metricMap, e.logger)
+	errMap := queryNamespaceMappings(ch, db, e.metricMap, e.logger)
 	if len(errMap) > 0 {
-		e.logger.Error("error querying namespace mappings", "err", errMap)
+		e.logger.Warn("error querying namespace mappings", "err", errMap)
 		up = 0
 	}
 
 	if len(errMap) == len(e.metricMap) {
 		up = 0
 	}
-	ch <- prometheus.MustNewConstMetric(scrapeSuccessDesc, prometheus.GaugeValue, up)
 }
 
 // Turn the MetricMap column mapping into a prometheus descriptor mapping.
