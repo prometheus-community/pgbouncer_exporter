@@ -1,5 +1,16 @@
 ## master / unreleased
 
+## 0.11.0 / 2025-06-13
+
+Notes:
+- This version changes the connection behavior to create a new client
+connection for each scrape. Previously a connection was created at startup.
+- This version now requires PgBouncer >= 1.8.
+
+* [CHANGE] Make connections per-scrape #214
+* [FEATURE] Add prepared statement metrics #194
+* [FEATURE] Add total_server_assignment_count metric #208
+
 ## 0.10.2 / 2024-10-18
 
 * [BUGFIX] Fix wrong logging level of "Starting scrape" message #175
