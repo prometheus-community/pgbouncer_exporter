@@ -151,6 +151,7 @@ func TestQueryShowStats(t *testing.T) {
 
 	// expected metrics are returned in the same order as the colums
 	expected := []MetricResult{
+		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: -1},   // server_assignment_count
 		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 10},   // xact_count
 		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 40},   // query_count
 		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 220},  // bytes_received
