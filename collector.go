@@ -74,6 +74,7 @@ var (
 			"sv_tested":             {GAUGE, "server_testing_connections", 1, "Server connections currently running either server_reset_query or server_check_query, shown as connection"},
 			"sv_login":              {GAUGE, "server_login_connections", 1, "Server connections currently in the process of logging in, shown as connection"},
 			"maxwait":               {GAUGE, "client_maxwait_seconds", 1, "Age of oldest unserved client connection, shown as second"},
+			"maxwait_us":            {GAUGE, "client_maxwait_fractional", 1e-6, "The fractional part of client_maxwait_seconds, in microseconds."},
 		},
 	}
 
