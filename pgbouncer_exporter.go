@@ -80,7 +80,9 @@ func main() {
 		prometheus.MustRegister(procExporter)
 	}
 
-	http.Handle(*metricsPath, promhttp.Handler())
+	mux := http.NewServeMux()
+	mux.Handle(*metricsPath, promhttp.Handler())
+
 	if *metricsPath != "/" && *metricsPath != "" {
 		landingConfig := web.LandingConfig{
 			Name:        "PgBouncer Exporter",
@@ -93,15 +95,20 @@ func main() {
 				},
 			},
 		}
+
 		landingPage, err := web.NewLandingPage(landingConfig)
 		if err != nil {
 			logger.Error("Error creating landing page", "err", err)
 			os.Exit(1)
 		}
-		http.Handle("/", landingPage)
+
+		mux.Handle("/", landingPage)
 	}
 
-	srv := &http.Server{}
+	srv := &http.Server{
+		Handler: mux,
+	}
+
 	if err := web.ListenAndServe(srv, toolkitFlags, logger); err != nil {
 		logger.Error("Error starting server", "err", err)
 		os.Exit(1)
