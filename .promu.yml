@@ -1,5 +1,5 @@
 go:
-  # This must match .circle/config.yml.
+  # This must match .circleci/config.yml.
   version: 1.25
 repository:
   path: github.com/prometheus-community/pgbouncer_exporter
