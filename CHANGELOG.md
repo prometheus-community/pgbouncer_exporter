@@ -1,5 +1,9 @@
 ## master / unreleased
 
+## 0.11.1 / 2026-02-09
+
+* [BUGFIX] Fix `pgbouncer_stats_totals_server_assignments_total` metric #228
+
 ## 0.11.0 / 2025-06-13
 
 Notes:

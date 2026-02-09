@@ -1,5 +1,5 @@
 # PgBouncer exporter
-[![Build Status](https://circleci.com/gh/prometheus-community/pgbouncer_exporter.svg?style=svg)](https://circleci.com/gh/prometheus-community/pgbouncer_exporter)
+[![Build Status](https://github.com/prometheus-community/pgbouncer_exporter/actions/workflows/ci.yml/badge.svg)](https://github.com/prometheus-community/pgbouncer_exporter/actions/workflows/ci.yml)
 
 Prometheus exporter for PgBouncer.
 Exports metrics at `9127/metrics`
