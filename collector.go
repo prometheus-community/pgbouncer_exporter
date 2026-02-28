@@ -124,8 +124,8 @@ var (
 )
 
 var (
-	clientsCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(namespace, "clients", "count"),
+	clientConnectionsDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "client", "connections"),
 		"Number of client connections grouped by database, user, application name, and state",
 		[]string{"database", "user", "application_name", "state"}, nil,
 	)
@@ -326,7 +326,7 @@ func queryShowClients(ch chan<- prometheus.Metric, db *sql.DB, _ *slog.Logger) e
 
 	for key, count := range counts {
 		ch <- prometheus.MustNewConstMetric(
-			clientsCountDesc,
+			clientConnectionsDesc,
 			prometheus.GaugeValue,
 			count,
 			key.database, key.user, key.applicationName, key.state,
