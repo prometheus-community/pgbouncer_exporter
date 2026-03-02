@@ -603,7 +603,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	if err = queryShowClients(ch, db, e.logger); err != nil {
 		e.logger.Warn("error getting SHOW CLIENTS", "err", err.Error())
-		up = 0
 	}
 
 	errMap := queryNamespaceMappings(ch, db, e.metricMap, e.logger)
