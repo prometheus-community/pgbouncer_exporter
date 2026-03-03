@@ -123,6 +123,14 @@ var (
 	}
 )
 
+var (
+	clientConnectionsDesc = prometheus.NewDesc(
+		prometheus.BuildFQName(namespace, "client", "connections"),
+		"Number of client connections grouped by database, user, application name, and state",
+		[]string{"database", "user", "application_name", "state"}, nil,
+	)
+)
+
 // Metric descriptors.
 var (
 	bouncerVersionDesc = prometheus.NewDesc(
@@ -233,6 +241,96 @@ func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logge
 		} else {
 			logger.Debug("SHOW CONFIG unknown config", "config", key)
 		}
+	}
+	return nil
+}
+
+// Query SHOW CLIENTS, aggregate by (database, user, application_name, state), and emit counts.
+func queryShowClients(ch chan<- prometheus.Metric, db *sql.DB, _ *slog.Logger) error {
+	rows, err := db.Query("SHOW CLIENTS;")
+	if err != nil {
+		return fmt.Errorf("error running SHOW CLIENTS on database: %w", err)
+	}
+	defer rows.Close()
+
+	columnNames, err := rows.Columns()
+	if err != nil {
+		return fmt.Errorf("error retrieving columns from SHOW CLIENTS: %w", err)
+	}
+
+	colIdx := make(map[string]int, len(columnNames))
+	for i, name := range columnNames {
+		colIdx[name] = i
+	}
+
+	for _, required := range []string{"database", "user", "state"} {
+		if _, ok := colIdx[required]; !ok {
+			return fmt.Errorf("SHOW CLIENTS missing required column: %s", required)
+		}
+	}
+
+	type groupKey struct{ database, user, applicationName, state string }
+	counts := make(map[groupKey]float64)
+
+	var (
+		dbCol    sql.RawBytes
+		userCol  sql.RawBytes
+		stateCol sql.RawBytes
+		appCol   sql.RawBytes
+		discard  sql.RawBytes
+	)
+	hasAppName := false
+	scanArgs := make([]any, len(columnNames))
+	for i, name := range columnNames {
+		switch name {
+		case "database":
+			scanArgs[i] = &dbCol
+		case "user":
+			scanArgs[i] = &userCol
+		case "state":
+			scanArgs[i] = &stateCol
+		case "application_name":
+			hasAppName = true
+			scanArgs[i] = &appCol
+		default:
+			scanArgs[i] = &discard
+		}
+	}
+
+	sanitize := func(s string) string {
+		if !utf8.ValidString(s) {
+			return "<invalid>"
+		}
+		return s
+	}
+
+	for rows.Next() {
+		if err := rows.Scan(scanArgs...); err != nil {
+			return fmt.Errorf("error scanning SHOW CLIENTS row: %w", err)
+		}
+		appName := ""
+		if hasAppName {
+			appName = string(appCol)
+		}
+		key := groupKey{
+			database:        sanitize(string(dbCol)),
+			user:            sanitize(string(userCol)),
+			applicationName: sanitize(appName),
+			state:           sanitize(string(stateCol)),
+		}
+		counts[key]++
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error iterating SHOW CLIENTS rows: %w", err)
+	}
+
+	for key, count := range counts {
+		ch <- prometheus.MustNewConstMetric(
+			clientConnectionsDesc,
+			prometheus.GaugeValue,
+			count,
+			key.database, key.user, key.applicationName, key.state,
+		)
 	}
 	return nil
 }
@@ -500,6 +598,11 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	if err = queryShowConfig(ch, db, e.logger); err != nil {
 		e.logger.Warn("error getting SHOW CONFIG", "err", err.Error())
+		up = 0
+	}
+
+	if err = queryShowClients(ch, db, e.logger); err != nil {
+		e.logger.Warn("error getting SHOW CLIENTS", "err", err.Error())
 		up = 0
 	}
 

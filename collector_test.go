@@ -130,6 +130,100 @@ func TestQueryShowConfig(t *testing.T) {
 	}
 }
 
+func TestQueryShowClients(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Error opening a stub db connection: %s", err)
+	}
+	defer db.Close()
+
+	rows := sqlmock.NewRows([]string{"type", "user", "database", "state", "addr",
+		"port", "local_addr", "local_port", "connect_time", "request_time",
+		"wait", "wait_us", "close_needed", "ptr", "link", "remote_pid", "tls", "application_name"}).
+		AddRow("C", "alice", "mydb", "active", "10.0.0.1", 5432, "10.0.0.2", 6432,
+			"2024-01-01", "2024-01-01", 0, 0, 0, "0x0", "", 0, "", "myapp").
+		AddRow("C", "alice", "mydb", "active", "10.0.0.3", 5432, "10.0.0.2", 6432,
+			"2024-01-01", "2024-01-01", 0, 0, 0, "0x1", "", 0, "", "myapp").
+		AddRow("C", "bob", "mydb", "idle", "10.0.0.4", 5432, "10.0.0.2", 6432,
+			"2024-01-01", "2024-01-01", 0, 0, 0, "0x2", "", 0, "", "otherapp")
+
+	mock.ExpectQuery("SHOW CLIENTS;").WillReturnRows(rows)
+	logger := slog.Default()
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		if err := queryShowClients(ch, db, logger); err != nil {
+			t.Errorf("Error running queryShowClients: %s", err)
+		}
+	}()
+
+	results := []MetricResult{}
+	for m := range ch {
+		results = append(results, readMetric(m))
+	}
+
+	convey.Convey("Clients metrics aggregated correctly", t, func() {
+		convey.So(len(results), convey.ShouldEqual, 2)
+		found := map[string]float64{}
+		for _, r := range results {
+			key := r.labels["user"] + "/" + r.labels["application_name"] + "/" + r.labels["state"]
+			found[key] = r.value
+		}
+		convey.So(found["alice/myapp/active"], convey.ShouldEqual, 2)
+		convey.So(found["bob/otherapp/idle"], convey.ShouldEqual, 1)
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
+func TestQueryShowClientsNoApplicationName(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("Error opening a stub db connection: %s", err)
+	}
+	defer db.Close()
+
+	// Simulate PgBouncer < 1.18 which does not expose application_name
+	rows := sqlmock.NewRows([]string{"type", "user", "database", "state", "addr",
+		"port", "local_addr", "local_port", "connect_time", "request_time",
+		"wait", "wait_us", "close_needed", "ptr", "link", "remote_pid", "tls"}).
+		AddRow("C", "alice", "mydb", "active", "10.0.0.1", 5432, "10.0.0.2", 6432,
+			"2024-01-01", "2024-01-01", 0, 0, 0, "0x0", "", 0, "").
+		AddRow("C", "alice", "mydb", "active", "10.0.0.3", 5432, "10.0.0.2", 6432,
+			"2024-01-01", "2024-01-01", 0, 0, 0, "0x1", "", 0, "")
+
+	mock.ExpectQuery("SHOW CLIENTS;").WillReturnRows(rows)
+	logger := slog.Default()
+
+	ch := make(chan prometheus.Metric)
+	go func() {
+		defer close(ch)
+		if err := queryShowClients(ch, db, logger); err != nil {
+			t.Errorf("Error running queryShowClients without application_name: %s", err)
+		}
+	}()
+
+	results := []MetricResult{}
+	for m := range ch {
+		results = append(results, readMetric(m))
+	}
+
+	convey.Convey("Clients metrics work without application_name column", t, func() {
+		convey.So(len(results), convey.ShouldEqual, 1)
+		convey.So(results[0].value, convey.ShouldEqual, 2)
+		convey.So(results[0].labels["application_name"], convey.ShouldEqual, "")
+		convey.So(results[0].labels["user"], convey.ShouldEqual, "alice")
+		convey.So(results[0].labels["state"], convey.ShouldEqual, "active")
+	})
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Errorf("there were unfulfilled expectations: %s", err)
+	}
+}
+
 func TestQueryShowDatabases(t *testing.T) {
 	rows := sqlmock.NewRows([]string{"name", "host", "port", "database", "pool_size"}).
 		AddRow("pg0_db", "10.10.10.1", "5432", "pg0", 20)
