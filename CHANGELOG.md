@@ -1,5 +1,9 @@
 ## master / unreleased
 
+## 0.12.0 / 2026-03-04
+
+* [FEATURE] Add SHOW CLIENTS metrics #250
+
 ## 0.11.1 / 2026-02-09
 
 * [BUGFIX] Fix `pgbouncer_stats_totals_server_assignments_total` metric #228
