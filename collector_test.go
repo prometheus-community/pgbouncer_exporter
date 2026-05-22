@@ -235,6 +235,30 @@ func TestQueryShowDatabases(t *testing.T) {
 	testQueryNamespaceMapping(t, "databases", rows, expected)
 }
 
+func TestQueryShowDatabasesReservePool(t *testing.T) {
+	// PgBouncer < 1.24 exposes the column as reserve_pool
+	rows := sqlmock.NewRows([]string{"name", "host", "port", "database", "reserve_pool"}).
+		AddRow("pg0_db", "10.10.10.1", "5432", "pg0", 5)
+
+	expected := []MetricResult{
+		{labels: labelMap{"name": "pg0_db", "host": "10.10.10.1", "port": "5432", "database": "pg0", "force_user": "", "pool_mode": ""}, metricType: dto.MetricType_GAUGE, value: 5},
+	}
+
+	testQueryNamespaceMapping(t, "databases", rows, expected)
+}
+
+func TestQueryShowDatabasesReservePoolSize(t *testing.T) {
+	// PgBouncer >= 1.24 renamed the column to reserve_pool_size
+	rows := sqlmock.NewRows([]string{"name", "host", "port", "database", "reserve_pool_size"}).
+		AddRow("pg0_db", "10.10.10.1", "5432", "pg0", 5)
+
+	expected := []MetricResult{
+		{labels: labelMap{"name": "pg0_db", "host": "10.10.10.1", "port": "5432", "database": "pg0", "force_user": "", "pool_mode": ""}, metricType: dto.MetricType_GAUGE, value: 5},
+	}
+
+	testQueryNamespaceMapping(t, "databases", rows, expected)
+}
+
 func TestQueryShowStats(t *testing.T) {
 	// columns are listed in the order PgBouncers exposes them, a value of -1 means pgbouncer_exporter does not expose this value as a metric
 	rows := sqlmock.NewRows([]string{"database",
