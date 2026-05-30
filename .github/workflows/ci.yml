@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
-      - uses: prometheus/promci@fc721ff8497a70a93a881cd552b71af7fb3a9d53 # v0.5.4
+      - uses: prometheus/promci@d9d4f5688814f0b77bf003d07fb8c00507390634 # v0.8.2
       - uses: ./.github/promci/actions/setup_environment
       - run: make
 
