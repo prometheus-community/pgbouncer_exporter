@@ -118,6 +118,7 @@ func TestQueryShowConfig(t *testing.T) {
 	expected := []MetricResult{
 		{labels: labelMap{}, metricType: dto.MetricType_GAUGE, value: 1900},
 		{labels: labelMap{}, metricType: dto.MetricType_GAUGE, value: 100},
+		{labels: labelMap{"method": "md5"}, metricType: dto.MetricType_GAUGE, value: 1},
 	}
 	convey.Convey("Metrics comparison", t, func() {
 		for _, expect := range expected {
