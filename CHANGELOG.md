@@ -1,5 +1,9 @@
 ## master / unreleased
 
+## 0.12.1 / 2026-06-26
+
+* [BUGFIX] Fix `reserve_pool` metric on PgBouncer >= 1.24 #271
+
 ## 0.12.0 / 2026-03-04
 
 * [FEATURE] Add SHOW CLIENTS metrics #250
