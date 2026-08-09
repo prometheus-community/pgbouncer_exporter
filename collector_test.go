@@ -17,17 +17,17 @@ import (
 	"log/slog"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/google/go-cmp/cmp"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	"github.com/smartystreets/goconvey/convey"
 )
 
 type labelMap map[string]string
 
 type MetricResult struct {
-	labels     labelMap
-	value      float64
-	metricType dto.MetricType
+	Labels     labelMap
+	Value      float64
+	MetricType dto.MetricType
 }
 
 func readMetric(m prometheus.Metric) MetricResult {
@@ -38,13 +38,13 @@ func readMetric(m prometheus.Metric) MetricResult {
 		labels[v.GetName()] = v.GetValue()
 	}
 	if pb.Gauge != nil {
-		return MetricResult{labels: labels, value: pb.GetGauge().GetValue(), metricType: dto.MetricType_GAUGE}
+		return MetricResult{Labels: labels, Value: pb.GetGauge().GetValue(), MetricType: dto.MetricType_GAUGE}
 	}
 	if pb.Counter != nil {
-		return MetricResult{labels: labels, value: pb.GetCounter().GetValue(), metricType: dto.MetricType_COUNTER}
+		return MetricResult{Labels: labels, Value: pb.GetCounter().GetValue(), MetricType: dto.MetricType_COUNTER}
 	}
 	if pb.Untyped != nil {
-		return MetricResult{labels: labels, value: pb.GetUntyped().GetValue(), metricType: dto.MetricType_UNTYPED}
+		return MetricResult{Labels: labels, Value: pb.GetUntyped().GetValue(), MetricType: dto.MetricType_UNTYPED}
 	}
 	panic("Unsupported metric type")
 }
@@ -74,18 +74,18 @@ func TestQueryShowList(t *testing.T) {
 	}()
 
 	expected := []MetricResult{
-		{labels: labelMap{}, metricType: dto.MetricType_GAUGE, value: -1},
-		{labels: labelMap{}, metricType: dto.MetricType_GAUGE, value: 1},
-		{labels: labelMap{}, metricType: dto.MetricType_GAUGE, value: 0},
-		{labels: labelMap{}, metricType: dto.MetricType_GAUGE, value: 2},
+		{Labels: labelMap{}, MetricType: dto.MetricType_GAUGE, Value: -1},
+		{Labels: labelMap{}, MetricType: dto.MetricType_GAUGE, Value: 1},
+		{Labels: labelMap{}, MetricType: dto.MetricType_GAUGE, Value: 0},
+		{Labels: labelMap{}, MetricType: dto.MetricType_GAUGE, Value: 2},
 	}
 
-	convey.Convey("Metrics comparison", t, func() {
-		for _, expect := range expected {
-			m := readMetric(<-ch)
-			convey.So(expect, convey.ShouldResemble, m)
+	for _, expect := range expected {
+		m := readMetric(<-ch)
+		if diff := cmp.Diff(expect, m); diff != "" {
+			t.Errorf("unexpected metric:\n%s", diff)
 		}
-	})
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled exceptions: %s", err)
 	}
@@ -116,15 +116,15 @@ func TestQueryShowConfig(t *testing.T) {
 	}()
 
 	expected := []MetricResult{
-		{labels: labelMap{}, metricType: dto.MetricType_GAUGE, value: 1900},
-		{labels: labelMap{}, metricType: dto.MetricType_GAUGE, value: 100},
+		{Labels: labelMap{}, MetricType: dto.MetricType_GAUGE, Value: 1900},
+		{Labels: labelMap{}, MetricType: dto.MetricType_GAUGE, Value: 100},
 	}
-	convey.Convey("Metrics comparison", t, func() {
-		for _, expect := range expected {
-			m := readMetric(<-ch)
-			convey.So(expect, convey.ShouldResemble, m)
+	for _, expect := range expected {
+		m := readMetric(<-ch)
+		if diff := cmp.Diff(expect, m); diff != "" {
+			t.Errorf("unexpected metric:\n%s", diff)
 		}
-	})
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled exceptions: %s", err)
 	}
@@ -163,16 +163,20 @@ func TestQueryShowClients(t *testing.T) {
 		results = append(results, readMetric(m))
 	}
 
-	convey.Convey("Clients metrics aggregated correctly", t, func() {
-		convey.So(len(results), convey.ShouldEqual, 2)
-		found := map[string]float64{}
-		for _, r := range results {
-			key := r.labels["user"] + "/" + r.labels["application_name"] + "/" + r.labels["state"]
-			found[key] = r.value
-		}
-		convey.So(found["alice/myapp/active"], convey.ShouldEqual, 2)
-		convey.So(found["bob/otherapp/idle"], convey.ShouldEqual, 1)
-	})
+	if got := len(results); got != 2 {
+		t.Errorf("expected %d, got %d", got, 2)
+	}
+	found := map[string]float64{}
+	for _, r := range results {
+		key := r.Labels["user"] + "/" + r.Labels["application_name"] + "/" + r.Labels["state"]
+		found[key] = r.Value
+	}
+	if got := found["alice/myapp/active"]; got != 2 {
+		t.Errorf("expected %f, got %q", got, 2)
+	}
+	if got := found["bob/otherapp/idle"]; got != 1 {
+		t.Errorf("expected %f, got %q", got, 2)
+	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
@@ -211,13 +215,21 @@ func TestQueryShowClientsNoApplicationName(t *testing.T) {
 		results = append(results, readMetric(m))
 	}
 
-	convey.Convey("Clients metrics work without application_name column", t, func() {
-		convey.So(len(results), convey.ShouldEqual, 1)
-		convey.So(results[0].value, convey.ShouldEqual, 2)
-		convey.So(results[0].labels["application_name"], convey.ShouldEqual, "")
-		convey.So(results[0].labels["user"], convey.ShouldEqual, "alice")
-		convey.So(results[0].labels["state"], convey.ShouldEqual, "active")
-	})
+	if got := len(results); got != 1 {
+		t.Errorf("expected results %d, got %d", got, 2)
+	}
+	if got := results[0].Value; got != 2 {
+		t.Errorf("expected value %f, got %d", got, 2)
+	}
+	if diff := cmp.Diff(results[0].Labels["application_name"], ""); diff != "" {
+		t.Errorf("expected label value for application_name:\n%s", diff)
+	}
+	if diff := cmp.Diff(results[0].Labels["user"], "alice"); diff != "" {
+		t.Errorf("expected label value for user:\n%s", diff)
+	}
+	if diff := cmp.Diff(results[0].Labels["state"], "active"); diff != "" {
+		t.Errorf("expected label value for state:\n%s", diff)
+	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled expectations: %s", err)
@@ -229,7 +241,7 @@ func TestQueryShowDatabases(t *testing.T) {
 		AddRow("pg0_db", "10.10.10.1", "5432", "pg0", 20)
 
 	expected := []MetricResult{
-		{labels: labelMap{"name": "pg0_db", "host": "10.10.10.1", "port": "5432", "database": "pg0", "force_user": "", "pool_mode": ""}, metricType: dto.MetricType_GAUGE, value: 20},
+		{Labels: labelMap{"name": "pg0_db", "host": "10.10.10.1", "port": "5432", "database": "pg0", "force_user": "", "pool_mode": ""}, MetricType: dto.MetricType_GAUGE, Value: 20},
 	}
 
 	testQueryNamespaceMapping(t, "databases", rows, expected)
@@ -241,7 +253,7 @@ func TestQueryShowDatabasesReservePool(t *testing.T) {
 		AddRow("pg0_db", "10.10.10.1", "5432", "pg0", 5)
 
 	expected := []MetricResult{
-		{labels: labelMap{"name": "pg0_db", "host": "10.10.10.1", "port": "5432", "database": "pg0", "force_user": "", "pool_mode": ""}, metricType: dto.MetricType_GAUGE, value: 5},
+		{Labels: labelMap{"name": "pg0_db", "host": "10.10.10.1", "port": "5432", "database": "pg0", "force_user": "", "pool_mode": ""}, MetricType: dto.MetricType_GAUGE, Value: 5},
 	}
 
 	testQueryNamespaceMapping(t, "databases", rows, expected)
@@ -253,7 +265,7 @@ func TestQueryShowDatabasesReservePoolSize(t *testing.T) {
 		AddRow("pg0_db", "10.10.10.1", "5432", "pg0", 5)
 
 	expected := []MetricResult{
-		{labels: labelMap{"name": "pg0_db", "host": "10.10.10.1", "port": "5432", "database": "pg0", "force_user": "", "pool_mode": ""}, metricType: dto.MetricType_GAUGE, value: 5},
+		{Labels: labelMap{"name": "pg0_db", "host": "10.10.10.1", "port": "5432", "database": "pg0", "force_user": "", "pool_mode": ""}, MetricType: dto.MetricType_GAUGE, Value: 5},
 	}
 
 	testQueryNamespaceMapping(t, "databases", rows, expected)
@@ -269,17 +281,17 @@ func TestQueryShowStats(t *testing.T) {
 
 	// expected metrics are returned in the same order as the colums
 	expected := []MetricResult{
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: -1},   // server_assignment_count
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 10},   // xact_count
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 40},   // query_count
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 220},  // bytes_received
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 460},  // bytes_sent
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 6e-6}, // xact_time
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 8e-6}, // query_time
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 9e-6}, // wait_time
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 5},    // client_parse_count
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 55},   // server_parse_count
-		{labels: labelMap{"database": "pg0"}, metricType: dto.MetricType_COUNTER, value: 555},  // bind_count
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: -1},   // server_assignment_count
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: 10},   // xact_count
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: 40},   // query_count
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: 220},  // bytes_received
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: 460},  // bytes_sent
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: 6e-6}, // xact_time
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: 8e-6}, // query_time
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: 9e-6}, // wait_time
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: 5},    // client_parse_count
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: 55},   // server_parse_count
+		{Labels: labelMap{"database": "pg0"}, MetricType: dto.MetricType_COUNTER, Value: 555},  // bind_count
 	}
 
 	testQueryNamespaceMapping(t, "stats_totals", rows, expected)
@@ -290,7 +302,7 @@ func TestQueryShowPools(t *testing.T) {
 		AddRow("pg0", "postgres", 2)
 
 	expected := []MetricResult{
-		{labels: labelMap{"database": "pg0", "user": "postgres"}, metricType: dto.MetricType_GAUGE, value: 2},
+		{Labels: labelMap{"database": "pg0", "user": "postgres"}, MetricType: dto.MetricType_GAUGE, Value: 2},
 	}
 
 	testQueryNamespaceMapping(t, "pools", rows, expected)
@@ -317,12 +329,12 @@ func testQueryNamespaceMapping(t *testing.T, namespaceMapping string, rows *sqlm
 		}
 	}()
 
-	convey.Convey("Metrics comparison", t, func() {
-		for _, expect := range expected {
-			m := readMetric(<-ch)
-			convey.So(m, convey.ShouldResemble, expect)
+	for _, expect := range expected {
+		m := readMetric(<-ch)
+		if diff := cmp.Diff(expect, m); diff != "" {
+			t.Errorf("unxpected metric result:\n%s", diff)
 		}
-	})
+	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled exceptions: %s", err)
 	}
