@@ -172,10 +172,10 @@ func TestQueryShowClients(t *testing.T) {
 		found[key] = r.Value
 	}
 	if got := found["alice/myapp/active"]; got != 2 {
-		t.Errorf("expected %f, got %q", got, 2)
+		t.Errorf("expected %f, got %d", got, 2)
 	}
 	if got := found["bob/otherapp/idle"]; got != 1 {
-		t.Errorf("expected %f, got %q", got, 2)
+		t.Errorf("expected %f, got %d", got, 2)
 	}
 
 	if err := mock.ExpectationsWereMet(); err != nil {
