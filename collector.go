@@ -24,7 +24,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/lib/pq"
-
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -189,6 +188,9 @@ func queryShowLists(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logger
 			logger.Debug("SHOW LISTS unknown list", "list", list)
 		}
 	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("error retrieving SHOW LISTS rows: %w", err)
+	}
 	return nil
 }
 
@@ -242,6 +244,9 @@ func queryShowConfig(ch chan<- prometheus.Metric, db *sql.DB, logger *slog.Logge
 		} else {
 			logger.Debug("SHOW CONFIG unknown config", "config", key)
 		}
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("error retrieving SHOW CONFIG rows: %w", err)
 	}
 	return nil
 }
@@ -535,6 +540,9 @@ func queryVersion(ch chan<- prometheus.Metric, db *sql.DB) error {
 			1.0,
 			bouncerVersion,
 		)
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("error retrieving SHOW VERSION rows: %w", err)
 	}
 
 	return nil
