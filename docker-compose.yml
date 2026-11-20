@@ -1,8 +1,10 @@
-version: '2'
+version: "2"
 
 services:
   postgres:
     image: postgres:9.4
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
     ports:
       - "5432"
 
