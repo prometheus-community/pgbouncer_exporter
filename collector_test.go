@@ -12,9 +12,8 @@
 package main
 
 import (
-	"testing"
-
 	"log/slog"
+	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/go-cmp/cmp"
