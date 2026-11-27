@@ -440,6 +440,9 @@ func getDB(conn *pq.Connector) (*sql.DB, error) {
 	}
 	rows, err := db.Query("SHOW STATS")
 	if err != nil {
+		// sql.OpenDB starts a goroutine that only stops on Close, so a
+		// failed scrape would otherwise leave one behind every time.
+		db.Close()
 		return nil, fmt.Errorf("error pinging pgbouncer: %w", err)
 	}
 	defer rows.Close()

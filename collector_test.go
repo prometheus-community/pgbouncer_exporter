@@ -12,12 +12,17 @@
 package main
 
 import (
+	"net"
+	"runtime"
+	"strings"
 	"testing"
+	"time"
 
 	"log/slog"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/go-cmp/cmp"
+	"github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
 )
@@ -338,4 +343,47 @@ func testQueryNamespaceMapping(t *testing.T, namespaceMapping string, rows *sqlm
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("there were unfulfilled exceptions: %s", err)
 	}
+}
+
+// openerGoroutines counts the goroutines started by sql.OpenDB that are still
+// waiting for connection requests.
+func openerGoroutines() int {
+	buf := make([]byte, 1<<20)
+	buf = buf[:runtime.Stack(buf, true)]
+	return strings.Count(string(buf), "database/sql.(*DB).connectionOpener")
+}
+
+func TestGetDBClosesDBOnFailedConnect(t *testing.T) {
+	// Reserve a port and release it so that connecting to it is refused.
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := l.Addr().String()
+	l.Close()
+
+	conn, err := pq.NewConnector("postgres://postgres:@" + addr + "/pgbouncer?sslmode=disable&connect_timeout=1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	before := openerGoroutines()
+	for i := 0; i < 5; i++ {
+		db, err := getDB(conn)
+		if err == nil {
+			db.Close()
+			t.Fatal("expected an error when pgbouncer is unreachable")
+		}
+	}
+
+	// The opener goroutine exits shortly after Close, so allow it a moment.
+	var after int
+	for i := 0; i < 50; i++ {
+		after = openerGoroutines()
+		if after <= before {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("getDB left %d sql.DB goroutines running after failed connects", after-before)
 }
