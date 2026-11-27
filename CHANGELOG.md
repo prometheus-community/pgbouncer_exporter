@@ -1,5 +1,7 @@
 ## master / unreleased
 
+* [BUGFIX] Close the database handle when the connection to PgBouncer fails, so failed scrapes no longer leak a goroutine #322
+
 ## 0.12.1 / 2026-06-26
 
 * [BUGFIX] Fix `reserve_pool` metric on PgBouncer >= 1.24 #271
